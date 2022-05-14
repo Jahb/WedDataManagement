@@ -44,11 +44,9 @@ spec:
               value: "user-service"
             - name: STOCK_SERVICE_URL
               value: "stock-service"
-            - name: REDIS_HOST
-              value: redis-master
-            - name: REDIS_PORT
-              value: '6379'
-            - name: REDIS_PASSWORD
-              value: "redis"
-            - name: REDIS_DB
-              value: "0"
+            - name: MONGO_HOST
+              value: mongo-master
+            - name: MONGO_PORT
+              value: '27017'
+            - name: MONGO_PASSWORD
+              value: "mongo"
