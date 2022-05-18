@@ -7,15 +7,16 @@ import pymongo
 
 app = Flask("payment-service")
 
-db: pymongo.MongoClient = pymongo.MongoClient(
+client: pymongo.MongoClient = pymongo.MongoClient(
     host=os.environ['MONGO_HOST'],
     port=int(os.environ['MONGO_PORT']),
     username=os.environ['MONGO_USERNAME'],
     password=os.environ['MONGO_PASSWORD'],
 )
 
+
 def close_db_connection():
-    db.close()
+    client.close()
 
 
 atexit.register(close_db_connection)
