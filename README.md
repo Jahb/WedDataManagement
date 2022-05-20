@@ -3,6 +3,29 @@
 Basic project structure with Python's Flask and Redis. 
 **You are free to use any web framework in any language and any database you like for this project.**
 
+
+To start up the docker container:
+```commandline
+docker-compose up --build
+```
+
+To connect to one of the running MongoDB instances:
+
+1. First, start up the docker container
+2. Then run the mongosh command on the desired DB image, one of `weddatamanagement_{payment,stock,order}-db_1`.
+    ```commandline
+   docker exec -it weddatamanagement_payment-db_1 mongosh --username root
+   ```
+   It will prompt for a password, use `mongo`. You are now connected and authenticated with the payment db.
+
+To run the python tests,
+
+1. First, start up the docker container
+2. Then run
+   ```commandline
+   python test/test_microservices.py
+   ```
+
 ### Project structure
 
 * `env`

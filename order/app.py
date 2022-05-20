@@ -2,17 +2,21 @@ import os
 import atexit
 
 from flask import Flask
-import redis
+import pymongo
 
 
 gateway_url = os.environ['GATEWAY_URL']
 
 app = Flask("order-service")
 
-db: redis.Redis = redis.Redis(host=os.environ['REDIS_HOST'],
-                              port=int(os.environ['REDIS_PORT']),
-                              password=os.environ['REDIS_PASSWORD'],
-                              db=int(os.environ['REDIS_DB']))
+db: pymongo.MongoClient = pymongo.MongoClient(
+    host=os.environ['MONGO_HOST'],
+    port=int(os.environ['MONGO_PORT']),
+    username=os.environ['MONGO_USERNAME'],
+    password=os.environ['MONGO_PASSWORD'],
+)
+
+print("server version:", db.server_info()["version"])
 
 
 def close_db_connection():
