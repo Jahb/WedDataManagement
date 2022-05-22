@@ -48,7 +48,11 @@ def find_item(item_id: str):
 
 @app.post('/add/<item_id>/<amount>')
 def add_stock(item_id: str, amount: int):
-    return jsonify(success=True) if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": int(amount)}}).modified_count == 1 else jsonify({'error': 'Fail'}), 400
+    modified_count = stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": int(amount)}}).modified_count
+    if int(modified_count) == 1:
+        return jsonify({"success": True})
+    else:
+        return jsonify({'error': 'Fail'}), 400
 
 
 @app.post('/subtract/<item_id>/<amount>')
@@ -56,4 +60,9 @@ def remove_stock(item_id: str, amount: int):
     item = find_item(item_id)
     if item["stock"] < int(amount):
         return jsonify({'error': 'Fail'}), 400
-    return jsonify(success=True) if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -int(amount)}}).modified_count == 1 else jsonify({'error': 'Fail'}), 400
+    
+    modified_count = stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -int(amount)}}).modified_count
+    if int(modified_count) == 1:
+        return jsonify({"success": True})
+    else:
+        return jsonify({'error': 'Fail'}), 400
