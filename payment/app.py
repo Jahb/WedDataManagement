@@ -84,7 +84,7 @@ def remove_credit(user_id: str, order_id: str, amount: int):
 def cancel_payment(user_id: str, order_id: str):
     with client.start_session() as session:
         with session.start_transaction():
-            barrier_entry = payment_barrier.find_one("_id" : ObjectId(order_id))
+            barrier_entry = payment_barrier.find_one({"_id" : ObjectId(order_id)})
             if barrier_entry is None:
                 return jsonify(success=True) # TODO: is this correct? the original payment did not go through, so after cancelling we are in a good state
 
@@ -101,7 +101,7 @@ def payment_status(user_id: str, order_id: str):
     # GET - returns the status of the payment (paid or not)
     # Output JSON fields: “paid” (true/false)
 
-    payment_made = payment_barrier.find_one("_id" : ObjectId(order_id)) is not None
-    payment_cancelled = cancel_payment_barrier.find_one("_id" : ObjectId(order_id)) is not None
+    payment_made = payment_barrier.find_one({"_id" : ObjectId(order_id)}) is not None
+    payment_cancelled = cancel_payment_barrier.find_one({"_id" : ObjectId(order_id)}) is not None
 
     return {"paid" : payment_made and not payment_cancelled}
