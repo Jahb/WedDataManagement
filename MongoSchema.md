@@ -10,16 +10,6 @@
     }
 ```
 
-## Documents: PaymentStatus
-
-```json
-    {
-        userID: str,
-        orderID: str,
-        orderStatus: boolean
-    }
-```
-
 ## Documents: PaymentBarrier
 
 ```json
