@@ -58,7 +58,7 @@ def find_user(user_id: str):
 def add_credit(user_id: str, amount: int):
     # POST - adds funds (amount) to the user’s (user_id) account
     # Output JSON fields: “done” (true/false)
-    if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"stock": int(amount)}}).modified_count != 1:
+    if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": int(amount)}}).modified_count != 1:
         return jsonify({'error': f"User {user_id} could not be updated"}), 400
 
     return {"done": True}
@@ -75,7 +75,7 @@ def remove_credit(user_id: str, order_id: str, amount: int):
                 return jsonify({'error': f"User {user_id} has only {available_credit} but {amount} is required"}), 400
 
             payment_barrier.insert_one({"_id": ObjectId(order_id), "amount": int(amount)})
-            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"stock": -int(amount)}}).modified_count == 1:
+            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": -int(amount)}}).modified_count == 1:
                 return jsonify(success=True)
 
     return jsonify({'error': 'Fail'}), 400
@@ -93,7 +93,7 @@ def cancel_payment(user_id: str, order_id: str):
             amount = int(barrier_entry["amount"])
 
             cancel_payment_barrier.insert_one({"_id": ObjectId(order_id)})
-            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"stock": amount}}).modified_count == 1:
+            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": amount}}).modified_count == 1:
                 return jsonify(success=True)
 
     return jsonify({'error': 'Fail'}), 400
