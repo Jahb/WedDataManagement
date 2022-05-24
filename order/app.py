@@ -82,6 +82,7 @@ def remove_item(order_id, item_id):
 
 @app.get('/find/<order_id>')
 def find_order(order_id):
+    # TODO
     # GET - retrieves the information of an order (id, payment status, items included and user id)
     # Output JSON fields:
         # “order_id”  - the order’s id
@@ -89,10 +90,44 @@ def find_order(order_id):
         # “items”  - list of item ids that are included in the order
         # “user_id”  - the user’s id that made the order
         # “total_cost” - the total cost of the items in the order
-    pass
+    order = orders.find_one({"_id": ObjectId(order_id)})
+    order_items = order["items"]
+
+    total_cost = 0 # TODO this could def be made better
+    for order_item in order_items:
+        total_cost += int(requests.post(f"{gateway_url}/stock/find/{order_item}").json()["price"])
+
+    payment_resp = requests.post(f"{gateway_url}/payment/status/{order['user_id']}/{order['_id']}")
+
+    return {
+        'order_id' : str(order['_id']),
+        'paid' : payment_resp.json()['paid'],
+        'items' : order['items'],
+        'user_id' : str(order['user_id']),
+        'total_cost' : total_cost
+    }
 
 
 @app.post('/checkout/<order_id>')
 def checkout(order_id):
-    # POST - makes the payment (via calling the payment service), subtracts the stock (via the stock service) and returns a status (success/failure).
-    pass
+    # TODO WIP (currently succeeds when it shouldn't. also does not undo any changes)
+
+    # POST - makes the payment (via calling the payment service),
+    # subtracts the stock (via the stock service)
+    # and returns a status (success/failure).
+
+    order = find_order(order_id)
+
+    payment_resp = requests.post(f"{gateway_url}/payment/pay/{order['user_id']}/{order_id}/{order['total_cost']}")
+    if (payment_resp.status_code >= 400):
+        return jsonify({"error" : f"could not pay"}), 400
+
+
+    order_items = order["items"]
+
+    for order_item in order_items: # TODO this could def be made better
+        resp = requests.post(f"{gateway_url}/stock/subtract/{order_item}/1")
+        if (resp.status_code >= 400):
+            return jsonify({"error" : f"could not subtract stock {order_item}"}), 400
+
+    return jsonify({"success": True})
