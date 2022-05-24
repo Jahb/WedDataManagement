@@ -35,7 +35,8 @@ def create_user():
     # Output JSON fields: “user_id” - the user’s id
     user = { "credit" : 0 }
     users.insert_one(user)
-    user["user_id"] = str(user["_id"])
+    user["_id"] = str(user["_id"])
+    # user["user_id"] = str(user["_id"])
     return user
 
 
