@@ -42,9 +42,10 @@ services:
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/payment_mongo.env
-
+      
   payment-db:
-    image: mongo:latest
+    build: ./mongo/
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
+
