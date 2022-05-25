@@ -34,6 +34,7 @@ def create_item(price: int):
     item = {"stock": 0, "price": price}
     stock.insert_one(item)
     item["_id"] = str(item["_id"])
+    item["item_id"] = str(item["_id"])
     return item
 
 
@@ -41,6 +42,7 @@ def create_item(price: int):
 def find_item(item_id: str):
     item = stock.find_one({"_id": ObjectId(item_id)})
     item["_id"] = str(item["_id"])
+    item["item_id"] = str(item["_id"])
     item["price"] = int(item["price"])
     item["stock"] = int(item["stock"])
     return item

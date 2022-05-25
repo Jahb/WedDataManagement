@@ -10,6 +10,23 @@
     }
 ```
 
+## Documents: PaymentBarrier
+
+```json
+    {
+        orderID: str
+        amount: int
+    }
+```
+
+## Documents: CancelPaymentBarrier
+
+```json
+    {
+        orderID: str
+    }
+```
+
 # Collection: Orders
 
 ## Documents: Order
