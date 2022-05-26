@@ -30,11 +30,28 @@ services:
     env_file:
       - env/stock_mongo.env
 
-  stock-db:
-    image: mongo:latest
+  payment-service:
+    build: ./payment
+    image: user:latest
+    command: gunicorn -b 0.0.0.0:5000 app:app
+    env_file:
+      - env/payment_mongo.env
+
+  order-db:
+    build: ./mongo/
+    container_name: order-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
+    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
+
+  stock-db:
+    build: ./mongo/
+    container_name: stock-db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
 
   payment-service:
     build: ./payment
@@ -45,7 +62,20 @@ services:
       
   payment-db:
     build: ./mongo/
+    container_name: payment-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
+    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
+
+  mongosetup:
+    image: "mongo-setup"
+    build: "./mongo-setup"
+    container_name: "mongosetup"
+    depends_on:
+        - order-db
+        - stock-db
+        - payment-db
+    volumes:
+        - mongostatus:/data/
 
