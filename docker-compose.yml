@@ -32,34 +32,28 @@ services:
       - env/payment_mongo.env
 
   order-db:
-    image: mongo:latest
+    build: ./mongo/
     container_name: order-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/data/keyfile"]
-    volumes:
-      - ./keyfiles/order-keyfile:/data/keyfile:ro
+    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
 
   stock-db:
-    image: mongo:latest
+    build: ./mongo/
     container_name: stock-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/data/keyfile"]
-    volumes:
-      - ./keyfiles/stock-keyfile:/data/keyfile:ro
+    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
 
   payment-db:
-    image: mongo:latest
+    build: ./mongo/
     container_name: payment-db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/data/keyfile"]
-    volumes:
-      - ./keyfiles/payment-keyfile:/data/keyfile:ro
+    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
 
   mongosetup:
     image: "mongo-setup"
