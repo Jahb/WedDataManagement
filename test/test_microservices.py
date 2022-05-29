@@ -8,9 +8,10 @@ class TestMicroservices(unittest.TestCase):
     def test_stock(self):
         # Test /stock/item/create/<price>
         item: dict = tu.create_item(5)
-        self.assertTrue('item_id' in item)
 
-        item_id: str = item['item_id']
+        self.assertTrue('_id' in item)
+
+        item_id: str = item['_id']
 
         # Test /stock/find/<item_id>
         item: dict = tu.find_item(item_id)
@@ -19,6 +20,7 @@ class TestMicroservices(unittest.TestCase):
 
         # Test /stock/add/<item_id>/<number>
         add_stock_response = tu.add_stock(item_id, 50)
+
         self.assertTrue(200 <= int(add_stock_response) < 300)
 
         stock_after_add: int = tu.find_item(item_id)['stock']
@@ -26,10 +28,12 @@ class TestMicroservices(unittest.TestCase):
 
         # Test /stock/subtract/<item_id>/<number>
         over_subtract_stock_response = tu.subtract_stock(item_id, 200)
-        self.assertTrue(tu.status_code_is_failure(int(over_subtract_stock_response)))
+        self.assertTrue(tu.status_code_is_failure(
+            int(over_subtract_stock_response)))
 
         subtract_stock_response = tu.subtract_stock(item_id, 15)
-        self.assertTrue(tu.status_code_is_success(int(subtract_stock_response)))
+        self.assertTrue(tu.status_code_is_success(
+            int(subtract_stock_response)))
 
         stock_after_subtract: int = tu.find_item(item_id)['stock']
         self.assertEqual(stock_after_subtract, 35)
@@ -73,6 +77,9 @@ class TestMicroservices(unittest.TestCase):
 
         credit_after_payment: int = tu.find_user(user_id)['credit']
         self.assertEqual(credit_after_payment, 5)
+        
+        payment_response2 = tu.payment_pay(user_id, order_id, 10000)
+        self.assertTrue(tu.status_code_is_failure(payment_response2))
 
     def test_order(self):
         # Test /payment/pay/<user_id>/<order_id>
@@ -108,7 +115,8 @@ class TestMicroservices(unittest.TestCase):
         subtract_stock_response = tu.subtract_stock(item_id2, 1)
         self.assertTrue(tu.status_code_is_success(subtract_stock_response))
 
-        checkout_response = tu.checkout_order(order_id).status_code
+        tst = tu.checkout_order(order_id)
+        checkout_response = tst.status_code
         self.assertTrue(tu.status_code_is_failure(checkout_response))
 
         stock_after_subtract: int = tu.find_item(item_id1)['stock']
