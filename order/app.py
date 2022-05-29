@@ -2,6 +2,7 @@ import json
 import os
 import atexit
 from bson import ObjectId
+from collections import Counter
 
 from flask import Flask, jsonify
 import pymongo
@@ -133,10 +134,12 @@ def checkout(order_id):
 
     order_items = order["items"]
     
+    order_items_counts = Counter(order_items)
+    
     completed_items = []
 
-    for order_item in order_items: # TODO this could def be made better
-        resp = requests.post(f"{gateway_url}/stock/subtract/{order_item}/1")
+    for order_item in order_items_counts: # TODO this could def be made better
+        resp = requests.post(f"{gateway_url}/stock/subtract/{order_item}/{order_items_counts[order_item]}")
         if (resp.status_code >= 400):
             ## Attempt to undo what has happened so far. Stock subtraction failed.
             refund_resp = undo_payment(order)
@@ -163,8 +166,9 @@ def undo_payment(order):
         return jsonify({"success" : True}), 200
 
 def undo_stock_update(completed_items):
-    for completed_item in completed_items:
-        resp = requests.post(f"{gateway_url}/stock/add/{completed_item['item_id']}/1")
+    completed_items_counts = Counter(completed_items)
+    for completed_item in completed_items_counts:
+        resp = requests.post(f"{gateway_url}/stock/add/{completed_item['item_id']}/{completed_items_counts[completed_item]}")
         if (resp.status_code >= 400):
             return jsonify({"error" : f"could not subtract stock and Failed to rollback previous stock updates."}), 400
     return jsonify({"error" : f"could not subtract stock {order_item}"}), 400
