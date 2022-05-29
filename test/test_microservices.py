@@ -77,6 +77,9 @@ class TestMicroservices(unittest.TestCase):
 
         credit_after_payment: int = tu.find_user(user_id)['credit']
         self.assertEqual(credit_after_payment, 5)
+        
+        payment_response2 = tu.payment_pay(user_id, order_id, 10000)
+        self.assertTrue(tu.status_code_is_failure(payment_response2))
 
     def test_order(self):
         # Test /payment/pay/<user_id>/<order_id>
@@ -112,7 +115,8 @@ class TestMicroservices(unittest.TestCase):
         subtract_stock_response = tu.subtract_stock(item_id2, 1)
         self.assertTrue(tu.status_code_is_success(subtract_stock_response))
 
-        checkout_response = tu.checkout_order(order_id).status_code
+        tst = tu.checkout_order(order_id)
+        checkout_response = tst.status_code
         self.assertTrue(tu.status_code_is_failure(checkout_response))
 
         stock_after_subtract: int = tu.find_item(item_id1)['stock']

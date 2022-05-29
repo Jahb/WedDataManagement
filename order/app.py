@@ -95,9 +95,17 @@ def find_order(order_id):
 
     total_cost = 0 # TODO this could def be made better
     for order_item in order_items:
-        total_cost += int(requests.post(f"{gateway_url}/stock/find/{order_item}").json()["price"])
+        order_item_response = requests.get(f"{gateway_url}/stock/find/{order_item}")
+        
+        if order_item_response.status_code >= 400:
+            return jsonify({"error" : f"could not find item to calculate total cost!"}), 400
+        
+        total_cost += int(order_item_response.json()["price"])
 
     payment_resp = requests.post(f"{gateway_url}/payment/status/{order['user_id']}/{order['_id']}")
+    
+    if payment_resp.status_code >= 400:
+        return jsonify({"error" : f"could not find payment status!"}), 400
 
     return {
         'order_id' : str(order['_id']),
@@ -119,9 +127,9 @@ def checkout(order_id):
     order = find_order(order_id)
 
     payment_resp = make_payment(order)
-    if(payment_resp.status_code >= 400):
+    if(payment_resp[1] >= 400):
         #Payment fail
-        return payment_resp
+        return jsonify({"error" : f"could not pay"}), 400
 
     order_items = order["items"]
     
@@ -133,28 +141,28 @@ def checkout(order_id):
             ## Attempt to undo what has happened so far. Stock subtraction failed.
             refund_resp = undo_payment(order)
             stock_resp = undo_stock_update(completed_items)
-            if refund_resp.status_code >= 400 or stock_resp.status_code >= 400:
-                return jsonify({"error" : f"could not undo. Refund Status Code: {refund_resp.status_code}, StockUndo Status Code: {stock_resp.status_code}"}), 400
+            if refund_resp[1] >= 400 or stock_resp[1] >= 400:
+                return jsonify({"error" : f"could not undo. Refund Status Code: {refund_resp[1]}, StockUndo Status Code: {stock_resp[1]}"}), 400
         else:
             completed_items.append(resp.json())
 
     return jsonify({"success": True})
 
 def make_payment(order):
-    resp = requests.post(f"{gateway_url}/payment/pay/{order['user_id']}/{order_id}/{order['total_cost']}")
+    resp = requests.post(f"{gateway_url}/payment/pay/{order['user_id']}/{order['order_id']}/{order['total_cost']}")
     if (resp.status_code >= 400):
         return jsonify({"error" : f"could not pay"}), 400
     else:
-        return jsonify({"success" : True})
+        return jsonify({"success" : True}), 200
 
 def undo_payment(order):
     resp = requests.post(f"{PAYMENT_URL}/payment/add_funds/{order['user_id']}/{order['total_cost']}")
     if (resp.status_code >= 400):
         return jsonify({"error" : f"could not refund"}), 400
     else:
-        return jsonify({"success" : True})
+        return jsonify({"success" : True}), 200
 
-def undo_stock_removal(completed_items):
+def undo_stock_update(completed_items):
     for completed_item in completed_items:
         resp = requests.post(f"{gateway_url}/stock/add/{completed_item['item_id']}/1")
         if (resp.status_code >= 400):
