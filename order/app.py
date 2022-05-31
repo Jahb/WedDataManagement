@@ -2,6 +2,7 @@ import json
 import os
 import atexit
 from bson import ObjectId
+from collections import Counter
 
 from flask import Flask, jsonify
 import pymongo
@@ -52,7 +53,7 @@ def remove_order(order_id):
     if orders.delete_one({"_id" : ObjectId(order_id)}).modified_count != 1:
         return jsonify({'error' : f"Could not delete order {order_id}"})
 
-    return jsonify({"success": True})
+    return jsonify({"success": True}), 200
 
 
 @app.post('/addItem/<order_id>/<item_id>')
@@ -62,9 +63,9 @@ def add_item(order_id, item_id):
         {"_id" : ObjectId(order_id)},
         {"$push" : {"items" : item_id}}
     ).modified_count != 1:
-        return jsonify({'error' : f"Could not add {item_id} to order {order_id}"})
+        return jsonify({'error' : f"Could not add {item_id} to order {order_id}"}), 400
 
-    return jsonify({"success": True})
+    return jsonify({"success": True}), 200
 
 
 @app.delete('/removeItem/<order_id>/<item_id>')
@@ -74,9 +75,9 @@ def remove_item(order_id, item_id):
         {"_id" : ObjectId(order_id)},
         {"$pull" : {"items" : item_id}}
     ).modified_count != 1:
-        return jsonify({'error' : f"Could not add {item_id} to order {order_id}"})
+        return jsonify({'error' : f"Could not remove {item_id} to order {order_id}"}), 400
 
-    return jsonify({"success": True})
+    return jsonify({"success": True}), 200
 
 
 
@@ -100,7 +101,7 @@ def find_order(order_id):
         if order_item_response.status_code >= 400:
             return jsonify({"error" : f"could not find item to calculate total cost!"}), 400
         
-        total_cost += int(order_item_response.json()["price"])
+        total_cost += float(order_item_response.json()["price"])
 
     payment_resp = requests.post(f"{gateway_url}/payment/status/{order['user_id']}/{order['_id']}")
     
@@ -133,38 +134,41 @@ def checkout(order_id):
 
     order_items = order["items"]
     
+    order_items_counts = Counter(order_items)
+    
     completed_items = []
 
-    for order_item in order_items: # TODO this could def be made better
-        resp = requests.post(f"{gateway_url}/stock/subtract/{order_item}/1")
+    for order_item, count in order_items_counts.most_common(): 
+        resp = requests.post(f"{gateway_url}/stock/subtract/{order_item}/{count}")
         if (resp.status_code >= 400):
             ## Attempt to undo what has happened so far. Stock subtraction failed.
             refund_resp = undo_payment(order)
             stock_resp = undo_stock_update(completed_items)
             if refund_resp[1] >= 400 or stock_resp[1] >= 400:
                 return jsonify({"error" : f"could not undo. Refund Status Code: {refund_resp[1]}, StockUndo Status Code: {stock_resp[1]}"}), 400
+            return jsonify({"error": f"check out failed due to insufficient funds or stock. successfully reverted"}), 444
         else:
-            completed_items.append(resp.json())
+            completed_items.append((order_item, count))
 
-    return jsonify({"success": True})
+    return jsonify({"success": True}), 200
 
 def make_payment(order):
     resp = requests.post(f"{gateway_url}/payment/pay/{order['user_id']}/{order['order_id']}/{order['total_cost']}")
     if (resp.status_code >= 400):
-        return jsonify({"error" : f"could not pay"}), 400
+        return jsonify({"error" : f"could not pay"}), resp.status_code
     else:
         return jsonify({"success" : True}), 200
 
 def undo_payment(order):
-    resp = requests.post(f"{PAYMENT_URL}/payment/add_funds/{order['user_id']}/{order['total_cost']}")
+    resp = requests.post(f"{gateway_url}/payment/add_funds/{order['user_id']}/{order['total_cost']}")
     if (resp.status_code >= 400):
-        return jsonify({"error" : f"could not refund"}), 400
+        return jsonify({"error" : f"could not refund"}), resp.status_code
     else:
         return jsonify({"success" : True}), 200
 
 def undo_stock_update(completed_items):
-    for completed_item in completed_items:
-        resp = requests.post(f"{gateway_url}/stock/add/{completed_item['item_id']}/1")
+    for completed_item, count in completed_items:
+        resp = requests.post(f"{gateway_url}/stock/add/{completed_item}/{count}")
         if (resp.status_code >= 400):
             return jsonify({"error" : f"could not subtract stock and Failed to rollback previous stock updates."}), 400
-    return jsonify({"error" : f"could not subtract stock {order_item}"}), 400
+    return jsonify({"success" : True}), 200
