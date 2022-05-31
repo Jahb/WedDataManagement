@@ -4,7 +4,7 @@ import utils as tu
 
 
 class TestMicroservices(unittest.TestCase):
-
+    
     def test_stock(self):
         # Test /stock/item/create/<price>
         item: dict = tu.create_item(5)
@@ -149,6 +149,38 @@ class TestMicroservices(unittest.TestCase):
         credit: int = tu.find_user(user_id)['credit']
         self.assertEqual(credit, 5)
 
+    def test_idempotency(self):
+        # Test /payment/pay/<user_id>/<order_id>
+        user: dict = tu.create_user()
+        self.assertTrue('user_id' in user)
+
+        user_id: str = user['user_id']
+
+        # create order in the order service and add item to the order
+        order: dict = tu.create_order(user_id)
+        self.assertTrue('order_id' in order)
+
+        order_id: str = order['order_id']
+
+        add_funds_resp = tu.add_credit_to_user(user_id, 1000)
+        self.assertTrue(tu.status_code_is_success(add_funds_resp))
+        
+        payment_resp = tu.payment_pay(user_id, order_id, 25)
+        self.assertTrue(tu.status_code_is_success(payment_resp))
+
+        # payment should have taken effect
+        credit_after_payment: int = tu.find_user(user_id)['credit']
+        self.assertEqual(credit_after_payment, 975)
+
+        payment_resp = tu.payment_pay(user_id, order_id, 25) # repeating the same payment is stopped because of idempotency
+        self.assertTrue(payment_resp == 222)
+
+        payment_resp = tu.payment_pay(user_id, order_id, 50) # repeating the same payment with diff amount is stopped because of idempotency
+        self.assertTrue(payment_resp == 222)
+
+        # only the first payment should have taken effect
+        credit_after_payment: int = tu.find_user(user_id)['credit']
+        self.assertEqual(credit_after_payment, 975)
 
 if __name__ == '__main__':
     unittest.main()
