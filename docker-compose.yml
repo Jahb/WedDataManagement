@@ -7,6 +7,12 @@ services:
       - ./gateway_nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8000:80"
+    networks:
+    - network
+    depends_on:
+      - order-service
+      - stock-service
+      - payment-service
 
   # rabbitmq:
   #   image: rabbitmq:latest
@@ -25,13 +31,15 @@ services:
     container_name: "rabbitmq"
     image: rabbitmq:3.8-management-alpine
     environment:
-        - RABBITMQ_DEFAULT_USER=rabbitmq
-        - RABBITMQ_DEFAULT_PASS=rabbitmq
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
     ports:
-        # AMQP protocol port
-        - '5672:5672'
-        # HTTP management UI
-        - '15672:15672'
+      # AMQP protocol port
+      - '5672:5672'
+      # HTTP management UI
+      - '15672:15672'
+    networks:
+    - network
 
   order-service:
     build: ./order
@@ -41,6 +49,10 @@ services:
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/order_mongo.env
+    depends_on:
+      - rabbitmq3
+    networks:
+    - network
 
   stock-service:
     build: ./stock
@@ -48,6 +60,10 @@ services:
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/stock_mongo.env
+    depends_on:
+      - rabbitmq3
+    networks:
+    - network
 
   payment-service:
     build: ./payment
@@ -55,6 +71,10 @@ services:
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/payment_mongo.env
+    depends_on:
+      - rabbitmq3
+    networks:
+    - network
 
   order-db:
     build: ./mongo/
@@ -63,6 +83,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
+    # networks:
+    # - network
 
   stock-db:
     build: ./mongo/
@@ -71,6 +93,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
+    # networks:
+    # - network
 
   payment-db:
     build: ./mongo/
@@ -79,6 +103,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
+    # networks:
+    # - network
 
   mongosetup:
     image: "mongo-setup"
@@ -90,6 +116,13 @@ services:
         - payment-db
     volumes:
         - mongostatus:/data/
+    # networks:
+    # - network
 
 volumes:
   mongostatus:
+
+networks:
+  # Declare our private network.  We must declare one for the magic
+  # Docker DNS to work, but otherwise its default settings are fine.
+  network: {}

@@ -8,21 +8,18 @@ from typing import List, Tuple
 from flask import Flask, jsonify
 import pymongo
 
+from time import sleep
 import functools
 import logging
 import json
 import pika
 from pika.exchange_type import ExchangeType
 
-from pika_producer import ExamplePublisher
-
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
 import requests
-
-gateway_url = os.environ['GATEWAY_URL']
 
 app = Flask("order-service")
 
@@ -39,15 +36,40 @@ orders = db["orders"]
 order_barrier = db["order_barrier"]
 cancel_order_barrier = db["cancel_order_barrier"]
 
-queue_url = f"amqp://guest:guest@127.0.0.1:5672/%2F"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+sleep(5)
+LOGGER.info("waiting 5s")
+sleep(5)
+LOGGER.info("waiting 5s")
+sleep(5)
+credentials = pika.PlainCredentials('guest', 'guest')
+parameters = pika.ConnectionParameters('rabbitmq3', credentials=credentials)
+connection = pika.BlockingConnection(parameters)
 
-# Connect to localhost:5672 as guest with the password guest and virtual host "/" (%2F)
-example = ExamplePublisher(
-    f'amqp://rabbitmq:rabbitmq@localhost:5672/%2F?connection_attempts=3&heartbeat=3600'
-)
-example.run()
+# connection = None
+# while connection is None:
+#     try:
+#         connection = pika.BlockingConnection(parameters)
+#     except pika.exceptions.AMQPConnectionError as e:
+#         sleep(2)
+#         LOGGER.warn("connection failed, retrying %s", e)
+
+main_channel = connection.channel()
+
+main_channel.exchange_declare(
+    exchange='payment-channel', 
+    exchange_type=ExchangeType.direct,
+    durable=True,
+    auto_delete=False,
+    passive=False)
+main_channel.exchange_declare(
+    exchange='stock-channel', 
+    exchange_type=ExchangeType.direct,
+    durable=True,
+    auto_delete=False,
+    passive=False)
+
 
 def close_db_connection():
     db.close()
@@ -149,7 +171,12 @@ def checkout(order_id):
     order = find_order(order_id)
 
     payment_resp = make_payment(order)
-    example.publish_message("making payment")
+
+    main_channel.basic_publish(
+        exchange='payment-channel',
+        routing_key='create.payment',
+        body=json.dumps(order),
+        properties=pika.BasicProperties(content_type='application/json'))
 
     if(payment_resp[1] >= 400):
         #Payment fail
