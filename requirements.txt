@@ -1,3 +1,6 @@
 requests==2.27.1
 Flask==2.1.1
 pymongo==4.1.1
+kubemq==2.2.4
+protobuf==3.20.1
+pika==1.2.1

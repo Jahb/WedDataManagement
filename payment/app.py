@@ -2,6 +2,18 @@ import os
 import atexit
 
 from flask import Flask, jsonify
+from typing import List, Tuple
+
+import datetime
+from time import sleep
+
+from kubemq.commandquery import ChannelParameters, Channel, RequestType, Request, Responder
+from kubemq.commandquery.response import Response
+from kubemq.subscription import SubscribeType, EventsStoreType, SubscribeRequest
+from kubemq.tools import ListenerCancellationToken
+
+PAYMENT_CHANNEL = "payments"
+CLIENT_ID = "payment-app-1"
 
 import pymongo
 from bson.objectid import ObjectId
@@ -29,6 +41,45 @@ def close_db_connection():
 
 atexit.register(close_db_connection)
 
+cancel_token = ListenerCancellationToken()
+
+def handle_incoming_request(request):
+    if request:
+        print("Subscriber Received request: Metadata:'%s', Channel:'%s', Body:'%s' tags:%s" % (
+            request.metadata,
+            request.channel,
+            request.body,
+            request.tags
+        ))
+        response = Response(request)
+        response.body = "OK".encode('UTF-8')
+        response.cache_hit = False
+        response.error = "None"
+        response.client_id = CLIENT_ID
+        response.executed = True
+        response.metadata = "OK"
+        response.timestamp = datetime.datetime.now()
+        return response
+
+
+def handle_incoming_error(error_msg):
+    print("received error:%s'" % (
+        error_msg
+    ))
+
+try:
+    responder = Responder("9090:9090")
+    subscribe_request = SubscribeRequest(
+        channel=PAYMENT_CHANNEL,
+        client_id=CLIENT_ID,
+        events_store_type=EventsStoreType.Undefined,
+        events_store_type_value=0,
+        group="",
+        subscribe_type=SubscribeType.Commands
+    )
+    responder.subscribe_to_requests(subscribe_request, handle_incoming_request, handle_incoming_error, cancel_token)
+except Exception as err:
+    print(f'error, error: {err}')
 
 @app.post('/create_user')
 def create_user():

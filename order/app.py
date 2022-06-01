@@ -3,11 +3,23 @@ import os
 import atexit
 from bson import ObjectId
 from collections import Counter
+from typing import List, Tuple
 
 from flask import Flask, jsonify
 import pymongo
 
+import datetime
+from time import sleep
+
+from kubemq.commandquery import ChannelParameters, Channel, RequestType, Request, Responder
+from kubemq.commandquery.response import Response
+from kubemq.subscription import SubscribeType, EventsStoreType, SubscribeRequest
+from kubemq.tools import ListenerCancellationToken
+
 import requests
+
+PAYMENT_CHANNEL = "payments"
+CLIENT_ID = "order-app-1"
 
 
 gateway_url = os.environ['GATEWAY_URL']
@@ -34,6 +46,30 @@ def close_db_connection():
 
 atexit.register(close_db_connection)
 
+def create_request_channel_parameters(request_type):
+    return ChannelParameters(
+        channel_name=PAYMENT_CHANNEL,
+        client_id=CLIENT_ID,
+        timeout=1000,
+        request_type=request_type,
+        kubemq_address="9090:9090"
+    )
+
+
+def send_command_request(body: str, tags: List(Tuple(str, str))):
+    request_channel_parameters = create_request_channel_parameters(RequestType.Command)
+    request_channel = Channel(channel_parameters=request_channel_parameters)
+
+    request = Request(
+        metadata="some-metadata",
+        body=body.encode('UTF-8'),
+        tags=tags
+    )
+
+    try:
+        request_channel.send_request(request)
+    except Exception as err:
+        print(f'error, error: {err}')
 
 @app.post('/create/<user_id>')
 def create_order(user_id):
@@ -127,7 +163,10 @@ def checkout(order_id):
 
     order = find_order(order_id)
 
+    send_command_request("make payment", [("order_id", order[order_id])])
+
     payment_resp = make_payment(order)
+
     if(payment_resp[1] >= 400):
         #Payment fail
         return jsonify({"error" : f"could not pay"}), 400
