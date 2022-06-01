@@ -8,10 +8,30 @@ services:
     ports:
       - "8000:80"
 
-  message-queue:
-    image: kubemq/kubemq-community:latest
-    ports: 
-      - 9090:9090
+  # rabbitmq:
+  #   image: rabbitmq:latest
+  #   ports:
+  #     # AMQP protocol port
+  #     - '5672:5672'
+  #     # HTTP management UI
+  #     - '15672:15672'
+  #   container_name: rabbitmq
+  #   hostname: rabbitmq
+  #   # image: kubemq/kubemq-community:latest
+  #   # ports: 
+  #   #   - 9090:9090
+
+  rabbitmq3:
+    container_name: "rabbitmq"
+    image: rabbitmq:3.8-management-alpine
+    environment:
+        - RABBITMQ_DEFAULT_USER=rabbitmq
+        - RABBITMQ_DEFAULT_PASS=rabbitmq
+    ports:
+        # AMQP protocol port
+        - '5672:5672'
+        # HTTP management UI
+        - '15672:15672'
 
   order-service:
     build: ./order
