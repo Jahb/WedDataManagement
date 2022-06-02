@@ -145,17 +145,17 @@ def checkout(order_id):
 
     order = find_order(order_id)
 
-    payment_resp = make_payment(order)
+    # payment_resp = make_payment(order)
 
 
     LOGGER.warn(" [x] Requesting fib(30)")
-    response = rpc.call(30)
-    LOGGER.warn(" [.] Got %r" % response)
+    payment_response = rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
+    LOGGER.warn(" [.] Got %r" % payment_response)
 
 
-    if(payment_resp[1] >= 400):
-        #Payment fail
-        return jsonify({"error" : f"could not pay"}), 400
+    # if(payment_response[1] >= 400):
+    #     #Payment fail
+    #     return jsonify({"error" : f"could not pay"}), 400
 
     order_items = order["items"]
     
