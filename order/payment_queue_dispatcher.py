@@ -35,36 +35,17 @@ class PaymentQueueDispatcher(object):
 
             self.response = body
 
-    def call(self, n):
+    def send_to_queue(self, corr_id, routing_key, body):
         self.response = None
-        self.corr_id = str(uuid.uuid4())
+        self.corr_id = str(corr_id)
         self.channel.basic_publish(
             exchange='',
-            routing_key='rpc_queue',
+            routing_key=routing_key,
             properties=pika.BasicProperties(
                 reply_to=self.callback_queue,
                 correlation_id=self.corr_id,
             ),
-            body=str(n))
-        while self.response is None:
-            self.connection.process_data_events()
-        return int(self.response)
-
-    def send_remove_credit(self, user_id, order_id, amount):
-        self.response = None
-        self.corr_id = str(order_id)
-        self.channel.basic_publish(
-            exchange='',
-            routing_key='remove_credit',
-            properties=pika.BasicProperties(
-                reply_to=self.callback_queue,
-                correlation_id=self.corr_id,
-            ),
-            body=json.dumps({
-                'user_id' : user_id, 
-                'order_id' : order_id, 
-                'amount' : amount})
-        )
+            body=body)
         while self.response is None:
             self.connection.process_data_events()
         resp = json.loads(self.response)
@@ -72,3 +53,30 @@ class PaymentQueueDispatcher(object):
             return resp
         else:
             raise Exception(resp['error'])
+
+    def send_create_user(self):
+        return self.send_to_queue(str(uuid.uuid4()), 'create_user', json.dumps({}))
+
+    def send_find_user(self, user_id):
+        return self.send_to_queue(str(uuid.uuid4()), 'find_user', json.dumps({'user_id' : user_id}))
+
+    def send_add_credit(self, user_id, amount):
+        return self.send_to_queue(str(uuid.uuid4()), 'add_credit', json.dumps({
+                'user_id' : user_id,
+                'amount' : amount}))
+
+    def send_remove_credit(self, user_id, order_id, amount):
+        return self.send_to_queue(str(order_id), 'remove_credit', json.dumps({
+                'user_id' : user_id, 
+                'order_id' : order_id, 
+                'amount' : amount}))
+
+    def send_cancel_payment(self, user_id, order_id):
+        return self.send_to_queue(str(order_id), 'cancel_payment', json.dumps({
+                'user_id' : user_id, 
+                'order_id' : order_id}))
+
+    def send_payment_status(self, user_id, order_id):
+        return self.send_to_queue(str(order_id), 'paymet_status', json.dumps({
+                'user_id' : user_id, 
+                'order_id' : order_id}))
