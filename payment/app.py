@@ -1,3 +1,4 @@
+from concurrent.futures import thread
 import os
 import atexit
 
@@ -12,6 +13,9 @@ import logging
 from time import sleep
 import pika
 from pika.exchange_type import ExchangeType
+import threading
+
+from payment_queue_handler import handler
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -35,50 +39,53 @@ cancel_payment_barrier = db["cancel_payment_barrier"]
 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-def on_message(chan, method_frame, header_frame, body, userdata=None):
-    """Called when a message is received. Log message and ack it."""
-    LOGGER.info('Delivery properties: %s, message metadata: %s', method_frame, header_frame)
-    LOGGER.info('Userdata: %s, message body: %s', userdata, body)
-    chan.basic_ack(delivery_tag=method_frame.delivery_tag)
+t = threading.Thread(target=handler,args=())
+t.start()
+
+# def on_message(chan, method_frame, header_frame, body, userdata=None):
+#     """Called when a message is received. Log message and ack it."""
+#     LOGGER.info('Delivery properties: %s, message metadata: %s', method_frame, header_frame)
+#     LOGGER.info('Userdata: %s, message body: %s', userdata, body)
+#     chan.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
-"""Main method."""
-sleep(5)
-LOGGER.info("waiting 5s")
-sleep(5)
-LOGGER.info("waiting 5s")
-sleep(5)
-credentials = pika.PlainCredentials('guest', 'guest')
-parameters = pika.ConnectionParameters('rabbitmq3', credentials=credentials)
-connection = pika.BlockingConnection(parameters)
-# connection = None
-# while connection is None:
-#     try:
-#         connection = pika.BlockingConnection(parameters)
-#     except pika.exceptions.AMQPConnectionError as e:
-#         sleep(2)
-#         LOGGER.warn("connection failed, retrying %s", e)
+# """Main method."""
+# sleep(5)
+# LOGGER.info("waiting 5s")
+# sleep(5)
+# LOGGER.info("waiting 5s")
+# sleep(5)
+# credentials = pika.PlainCredentials('guest', 'guest')
+# parameters = pika.ConnectionParameters('rabbitmq3', credentials=credentials)
+# connection = pika.BlockingConnection(parameters)
+# # connection = None
+# # while connection is None:
+# #     try:
+# #         connection = pika.BlockingConnection(parameters)
+# #     except pika.exceptions.AMQPConnectionError as e:
+# #         sleep(2)
+# #         LOGGER.warn("connection failed, retrying %s", e)
 
-channel = connection.channel()
-channel.exchange_declare(
-    exchange='payment-channel',
-    exchange_type=ExchangeType.direct,
-    passive=False,
-    durable=True,
-    auto_delete=False)
-channel.queue_declare(queue='standard', auto_delete=True)
-channel.queue_bind(
-    queue='standard', exchange='payment-channel', routing_key='create-payment')
-channel.basic_qos(prefetch_count=1)
+# channel = connection.channel()
+# channel.exchange_declare(
+#     exchange='payment-channel',
+#     exchange_type=ExchangeType.direct,
+#     passive=False,
+#     durable=True,
+#     auto_delete=False)
+# channel.queue_declare(queue='standard', auto_delete=True)
+# channel.queue_bind(
+#     queue='standard', exchange='payment-channel', routing_key='create-payment')
+# channel.basic_qos(prefetch_count=1)
 
-on_message_callback = functools.partial(
-    on_message, userdata='on_message_userdata')
-channel.basic_consume('standard', on_message_callback)
+# on_message_callback = functools.partial(
+#     on_message, userdata='on_message_userdata')
+# channel.basic_consume('standard', on_message_callback)
 
-try:
-    channel.start_consuming()
-except KeyboardInterrupt:
-    channel.stop_consuming()
+# try:
+#     channel.start_consuming()
+# except KeyboardInterrupt:
+#     channel.stop_consuming()
 
 
 def close_db_connection():

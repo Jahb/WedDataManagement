@@ -1,12 +1,15 @@
 import json
 import os
 import atexit
+import queue
 from bson import ObjectId
 from collections import Counter
 from typing import List, Tuple
 
 from flask import Flask, jsonify
 import pymongo
+
+from payment_queue_dispatcher import PaymentQueueDispatcher
 
 from time import sleep
 import functools
@@ -18,6 +21,9 @@ from pika.exchange_type import ExchangeType
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
+
+sleep(10)
+rpc = PaymentQueueDispatcher()
 
 import requests
 
@@ -38,42 +44,11 @@ cancel_order_barrier = db["cancel_order_barrier"]
 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-sleep(5)
-LOGGER.info("waiting 5s")
-sleep(5)
-LOGGER.info("waiting 5s")
-sleep(5)
-credentials = pika.PlainCredentials('guest', 'guest')
-parameters = pika.ConnectionParameters('rabbitmq3', credentials=credentials)
-connection = pika.BlockingConnection(parameters)
-
-# connection = None
-# while connection is None:
-#     try:
-#         connection = pika.BlockingConnection(parameters)
-#     except pika.exceptions.AMQPConnectionError as e:
-#         sleep(2)
-#         LOGGER.warn("connection failed, retrying %s", e)
-
-main_channel = connection.channel()
-
-main_channel.exchange_declare(
-    exchange='payment-channel', 
-    exchange_type=ExchangeType.direct,
-    durable=True,
-    auto_delete=False,
-    passive=False)
-main_channel.exchange_declare(
-    exchange='stock-channel', 
-    exchange_type=ExchangeType.direct,
-    durable=True,
-    auto_delete=False,
-    passive=False)
-
 
 def close_db_connection():
     db.close()
 
+gateway_url = os.environ["GATEWAY_URL"]
 
 atexit.register(close_db_connection)
 
@@ -172,11 +147,11 @@ def checkout(order_id):
 
     payment_resp = make_payment(order)
 
-    main_channel.basic_publish(
-        exchange='payment-channel',
-        routing_key='create.payment',
-        body=json.dumps(order),
-        properties=pika.BasicProperties(content_type='application/json'))
+
+    LOGGER.warn(" [x] Requesting fib(30)")
+    response = rpc.call(30)
+    LOGGER.warn(" [.] Got %r" % response)
+
 
     if(payment_resp[1] >= 400):
         #Payment fail

@@ -8,7 +8,9 @@ services:
     ports:
       - "8000:80"
     networks:
-    - network
+    - order-network
+    - stock-network
+    - payment-network
     depends_on:
       - order-service
       - stock-service
@@ -27,19 +29,42 @@ services:
   #   # ports: 
   #   #   - 9090:9090
 
-  rabbitmq3:
-    container_name: "rabbitmq"
-    image: rabbitmq:3.8-management-alpine
+  # rabbitmq3:
+  #   container_name: "rabbitmq"
+  #   image: rabbitmq:3.8-management-alpine
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=guest
+  #     - RABBITMQ_DEFAULT_PASS=guest
+  #   ports:
+  #     # AMQP protocol port
+  #     - '5672:5672'
+  #     # HTTP management UI
+  #     - '15672:15672'
+  #   networks:
+  #   - network
+
+
+  rabbitmq: # login guest:guest
+    container_name: mq
+    hostname: mq
+    image: rabbitmq
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
     ports:
-      # AMQP protocol port
-      - '5672:5672'
-      # HTTP management UI
-      - '15672:15672'
+      - "4369:4369"
+      - "5671:5671"
+      - "5672:5672"
+      - "25672:25672"
+      - "15671:15671"
+      - "15672:15672"
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
     networks:
-    - network
+      - mq-network
 
   order-service:
     build: ./order
@@ -50,9 +75,10 @@ services:
     env_file:
       - env/order_mongo.env
     depends_on:
-      - rabbitmq3
+      - rabbitmq
     networks:
-    - network
+    - mq-network
+    - order-network
 
   stock-service:
     build: ./stock
@@ -61,9 +87,10 @@ services:
     env_file:
       - env/stock_mongo.env
     depends_on:
-      - rabbitmq3
+      - rabbitmq
     networks:
-    - network
+    - mq-network
+    - stock-network
 
   payment-service:
     build: ./payment
@@ -72,9 +99,10 @@ services:
     env_file:
       - env/payment_mongo.env
     depends_on:
-      - rabbitmq3
+      - rabbitmq
     networks:
-    - network
+    - payment-network
+    - mq-network
 
   order-db:
     build: ./mongo/
@@ -83,8 +111,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
-    # networks:
-    # - network
+    networks:
+    - order-network
 
   stock-db:
     build: ./mongo/
@@ -93,8 +121,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
-    # networks:
-    # - network
+    networks:
+    - stock-network
 
   payment-db:
     build: ./mongo/
@@ -103,8 +131,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
     command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
-    # networks:
-    # - network
+    networks:
+    - payment-network
 
   mongosetup:
     image: "mongo-setup"
@@ -116,13 +144,20 @@ services:
         - payment-db
     volumes:
         - mongostatus:/data/
-    # networks:
-    # - network
+    networks:
+    - payment-network
+    - stock-network
+    - order-network
 
 volumes:
   mongostatus:
 
 networks:
-  # Declare our private network.  We must declare one for the magic
-  # Docker DNS to work, but otherwise its default settings are fine.
-  network: {}
+  order-network:
+    driver: bridge
+  payment-network:
+    driver: bridge
+  stock-network:
+    driver: bridge
+  mq-network:
+    driver: bridge
