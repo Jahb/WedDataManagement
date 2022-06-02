@@ -6,7 +6,7 @@ from urllib import response
 import json
 
 from flask import Flask, jsonify
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import pymongo
 from bson.objectid import ObjectId
@@ -170,22 +170,28 @@ def payment_queue_handler():
     channel.queue_declare(queue='cancel_payment')
     channel.queue_declare(queue='payment_status')
 
-    def _on_request(ch, method, props, response):
+    def _on_request(ch, method, props, *, success: bool = True, duplicate: bool = False, error: Any = None, body: dict = {}):
         ch.basic_publish(exchange='',
                         routing_key=props.reply_to,
                         properties=pika.BasicProperties(correlation_id = \
                                                             props.correlation_id),
-                        body=str(response))
+                        body=json.dumps(body | {"success" : success, "duplicate" : duplicate, "error" : error }))
     
     def queue_create_user(ch, method, props, body):
         LOGGER.info(f"[] received payment queue message: create_user()")
-        _on_request(ch, method, props, create_user())
+
+        user_id = create_user()
+
+        _on_request(ch, method, props, body={'user_id' : user_id})
         ch.basic_ack(delivery_tag=method.delivery_tag)
     
     def queue_find_user(ch, method, props, body):  
         user_id = str(body.decode("utf-8"))
         LOGGER.info(f"[] received payment queue message: find_user({user_id})")
-        _on_request(ch, method, props, find_user(body))
+
+        user = find_user(user_id)
+
+        _on_request(ch, method, props, body=user)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def queue_add_credit(ch, method, props, body):
@@ -193,7 +199,10 @@ def payment_queue_handler():
         user_id = str(req['user_id'])
         amount = float(req['amount'])
         LOGGER.info(f"[] received payment queue message: add_credit({user_id}, {amount})")
-        _on_request(ch, method, props, add_credit(user_id, amount))
+        
+        add_credit(user_id, amount)
+
+        _on_request(ch, method, props)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def queue_remove_credit(ch, method, props, body):
@@ -203,18 +212,23 @@ def payment_queue_handler():
         order_id = str(req['order_id'])
         amount = float(req['amount'])
         LOGGER.info(f"[] received payment queue message: remove_credit({user_id}, {order_id}, {amount})")
+        
         try:
             remove_credit_impl(user_id, order_id, amount)
             LOGGER.info(f"[] remove_credit ACK")
-            _on_request(ch, method, props, "success")
+            _on_request(ch, method, props)
             ch.basic_ack(delivery_tag=method.delivery_tag)
         except DuplicateOperationException as e:
             LOGGER.info(f"[] remove_credit ACK but duplicate ({e})")
-            _on_request(ch, method, props, e)
+            _on_request(ch, method, props, duplicate=True)
             ch.basic_ack(delivery_tag=method.delivery_tag)
+        except InsufficientFundException as e:
+            LOGGER.info(f"[] remove_credit NACK because of {e}")
+            _on_request(ch, method, props, success=False, error=str(e))
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         except Exception as e:
             LOGGER.info(f"[] remove_credit NACK because of {e}")
-            _on_request(ch, method, props, e)
+            _on_request(ch, method, props, success=False, error=str(e))
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
@@ -224,7 +238,10 @@ def payment_queue_handler():
         user_id = str(req['user_id'])
         order_id = str(req['order_id'])
         LOGGER.info(f"[] received payment queue message: cancel_payment({user_id}, {order_id})")
-        _on_request(ch, method, props, cancel_payment(user_id, order_id))
+        
+        cancel_payment(user_id, order_id)
+        
+        _on_request(ch, method, props)
         ch.basic_ack(delivery_tag=method.delivery_tag)
         
     

@@ -67,4 +67,8 @@ class PaymentQueueDispatcher(object):
         )
         while self.response is None:
             self.connection.process_data_events()
-        return self.response
+        resp = json.loads(self.response)
+        if (resp['success']):
+            return resp
+        else:
+            raise Exception(resp['error'])
