@@ -210,7 +210,7 @@ spec:
                 configMapKeyRef:
                   key: MONGO_USERNAME
                   name: mongo-order-env
-            - name: MONGO_USERNAME
+            - name: GATEWAY_URL
               valueFrom:
                 configMapKeyRef:
                   key: GATEWAY_URL
