@@ -64,13 +64,6 @@ def create_user():
     # Output JSON fields: “user_id” - the user’s id
     return jsonify(create_user_impl())
 
-def create_user_impl():
-    user = {"credit": 0}
-    users.insert_one(user)
-    return {
-        "user_id": str(user['_id'])
-    }
-
 
 @app.get('/find_user/<user_id>')
 def find_user(user_id: str):
@@ -80,12 +73,6 @@ def find_user(user_id: str):
     #   “credit” - the user’s credit
     return jsonify(find_user_impl(user_id))
 
-def find_user_impl(user_id: str):
-    user = users.find_one({"_id":  ObjectId(user_id)})
-    return {
-        "user_id": user_id,
-        "credit": float(user["credit"])
-    }
 
 @app.post('/add_funds/<user_id>/<amount>')
 def add_credit(user_id: str, amount: float):
@@ -96,9 +83,6 @@ def add_credit(user_id: str, amount: float):
         return jsonify({'error': f"User {user_id} could not be updated"}), 400
 
     return jsonify({"done": True}), 200
-
-def add_credit_impl(user_id: str, amount: float):
-    return users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": float(amount)}}).modified_count == 1
 
 
 @app.post('/pay/<user_id>/<order_id>/<amount>')
@@ -112,24 +96,6 @@ def remove_credit(user_id: str, order_id: str, amount: float):
     except Exception as e:
         return jsonify({'error' : str(e)}), 400
 
-def remove_credit_impl(user_id, order_id, amount):    
-    LOGGER.info(f"attempting to remove {amount}")
-    with client.start_session() as session:
-        with session.start_transaction():
-            try: 
-                available_credit = float(users.find_one({"_id":  ObjectId(user_id)})["credit"])
-
-                if available_credit < float(amount):
-                    raise InsufficientFundException(f"User {user_id} has only {available_credit} but {amount} is required")
-
-                payment_barrier.insert_one({"_id": ObjectId(order_id), "amount": float(amount)})
-                if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": -float(amount)}}).modified_count == 1:
-                    return
-            except pymongo.errors.DuplicateKeyError as e: 
-                raise DuplicateOperationException(e)
-
-    raise UnknownException()
-
 
 @app.post('/cancel/<user_id>/<order_id>')
 def cancel_payment(user_id: str, order_id: str):
@@ -141,7 +107,51 @@ def cancel_payment(user_id: str, order_id: str):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-def cancel_payment_impl(user_id: str, order_id: str):
+
+@app.post('/status/<user_id>/<order_id>')
+def payment_status(user_id: str, order_id: str):
+    return jsonify({"paid": payment_status_impl(order_id)}), 200
+
+
+def create_user_impl() -> dict:
+    user = {"credit": 0}
+    users.insert_one(user)
+    return {
+        "user_id": str(user['_id'])
+    }
+
+
+def find_user_impl(user_id: str) -> dict:
+    user = users.find_one({"_id":  ObjectId(user_id)})
+    return {
+        "user_id": user_id,
+        "credit": float(user["credit"])
+    }
+
+def add_credit_impl(user_id: str, amount: float) -> bool:
+    return users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": float(amount)}}).modified_count == 1
+
+
+def remove_credit_impl(user_id, order_id, amount) -> None:   
+    with client.start_session() as session:
+        with session.start_transaction():
+            try: 
+                available_credit = float(users.find_one({"_id":  ObjectId(user_id)})["credit"])
+
+                if available_credit < float(amount):
+                    raise InsufficientFundException(f"User {user_id} has only {available_credit} but {amount} is required")
+
+                payment_barrier.insert_one({"_id": ObjectId(order_id), "amount": float(amount)})
+                if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": -float(amount)}}).modified_count == 1:
+                    return
+                else:
+                    raise UnknownException()
+
+            except pymongo.errors.DuplicateKeyError as e: 
+                raise DuplicateOperationException(e)
+
+
+def cancel_payment_impl(user_id: str, order_id: str) -> None:
     with client.start_session() as session:
         with session.start_transaction():
             try:
@@ -163,12 +173,7 @@ def cancel_payment_impl(user_id: str, order_id: str):
 
     raise UnknownException()
 
-
-@app.post('/status/<user_id>/<order_id>')
-def payment_status(user_id: str, order_id: str):
-    return jsonify({"paid": payment_status_impl(order_id)}), 200
-
-def payment_status_impl(order_id: str):
+def payment_status_impl(order_id: str) -> bool:
 
     # GET - returns the status of the payment (paid or not)
     # Output JSON fields: “paid” (true/false)
@@ -179,7 +184,7 @@ def payment_status_impl(order_id: str):
     return payment_made and not payment_cancelled
 
 
-def payment_queue_handler():
+def payment_queue_handler() -> None:
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
             host='mq', 
@@ -187,12 +192,7 @@ def payment_queue_handler():
             heartbeat=600))
 
     channel = connection.channel()
-    channel.queue_declare(queue='create_user')
-    channel.queue_declare(queue='find_user')
-    channel.queue_declare(queue='add_credit')
-    channel.queue_declare(queue='remove_credit')
-    channel.queue_declare(queue='cancel_payment')
-    channel.queue_declare(queue='payment_status')
+    channel.queue_declare(queue='payment-queue')
 
     def _on_request(ch, method, props, *, success: bool = True, duplicate: bool = False, error: Any = None, body: dict = {}):
         ch.basic_publish(exchange='',
@@ -201,41 +201,62 @@ def payment_queue_handler():
                                                             props.correlation_id),
                         body=json.dumps(body | {"success" : success, "duplicate" : duplicate, "error" : error }))
     
-    def queue_create_user(ch, method, props, body):
-        LOGGER.info(f"[] received payment queue message: create_user()")
 
+    def queue_receive_message(ch, method, props, req):
+        body = json.loads(req.decode('utf-8'))
+        operation = body['operation']
+
+        arg_info_str = ', '.join(map(lambda s: str(s), filter(None, (body.get('user_id'), body.get('order_id'), body.get('amount')))))
+        LOGGER.info(f"[payment-queue] received message {operation}({arg_info_str})")
+
+        if operation == 'create_user':
+            _queue_create_user(ch, method, props)
+        elif operation == 'find_user':
+            _queue_find_user(ch, method, props, body)
+        elif operation == 'add_credit':
+            _queue_add_credit(ch, method, props, body)
+        elif operation == 'remove_credit':
+            _queue_remove_credit(ch, method, props, body)
+        elif operation == 'cancel_payment':
+            _queue_cancel_payment(ch, method, props, body)
+        elif operation == 'payment_status':
+            _queue_payment_status(ch, method, props, body)
+        else:
+            LOGGER.error(f"Unknown operation: {operation}")
+            _on_request(ch, method, props, success=False, error=f"Unknown op {operation}")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+
+    def _queue_create_user(ch, method, props):
         user = create_user_impl()
 
         _on_request(ch, method, props, body=user)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     
-    def queue_find_user(ch, method, props, body):  
-        user_id = str(body.decode("utf-8"))
-        LOGGER.info(f"[] received payment queue message: find_user({user_id})")
 
+    def _queue_find_user(ch, method, props, body):  
+        user_id = str(body['user_id'])
+        
         user = find_user_impl(user_id)
 
         _on_request(ch, method, props, body=user)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def queue_add_credit(ch, method, props, body):
-        req = json.loads(body.decode("utf-8"))
-        user_id = str(req['user_id'])
-        amount = float(req['amount'])
-        LOGGER.info(f"[] received payment queue message: add_credit({user_id}, {amount})")
+
+    def _queue_add_credit(ch, method, props, body):
+        user_id = str(body['user_id'])
+        amount = float(body['amount'])
         
         success = add_credit_impl(user_id, amount)
 
         _on_request(ch, method, props, success=success)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def queue_remove_credit(ch, method, props, body):
-        LOGGER.warn(f"[] body: {body}, {body.decode('utf-8')}")
-        req = json.loads(body.decode("utf-8"))
-        user_id = str(req['user_id'])
-        order_id = str(req['order_id'])
-        amount = float(req['amount'])
-        LOGGER.info(f"[] received payment queue message: remove_credit({user_id}, {order_id}, {amount})")
+
+    def _queue_remove_credit(ch, method, props, body):
+        user_id = str(body['user_id'])
+        order_id = str(body['order_id'])
+        amount = float(body['amount'])
         
         try:
             remove_credit_impl(user_id, order_id, amount)
@@ -256,12 +277,9 @@ def payment_queue_handler():
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
-    def queue_cancel_payment(ch, method, props, body):
-        LOGGER.warn(f"[] body: {body}, {body.decode('utf-8')}")
-        req = json.loads(body.decode("utf-8"))
-        user_id = str(req['user_id'])
-        order_id = str(req['order_id'])
-        LOGGER.info(f"[] received payment queue message: cancel_payment({user_id}, {order_id})")
+    def _queue_cancel_payment(ch, method, props, body):
+        user_id = str(body['user_id'])
+        order_id = str(body['order_id'])
         
         try:
             cancel_payment_impl(user_id, order_id)
@@ -278,24 +296,17 @@ def payment_queue_handler():
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         
     
-    def queue_payment_status(ch, method, props, body):
-        req = json.loads(body.decode("utf-8"))
-        user_id = str(req['user_id'])
-        order_id = str(req['order_id'])
-        LOGGER.info(f"[] received payment queue message: payment_status({user_id}, {order_id})")
+    def _queue_payment_status(ch, method, props, body):
+        # user_id = str(body['user_id'])
+        order_id = str(body['order_id'])
         
         result = payment_status_impl(order_id)
         
-        _on_request(ch, method, props, body={'result' : result})
+        _on_request(ch, method, props, body={'paid' : result})
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue='create_user', on_message_callback=queue_create_user)
-    channel.basic_consume(queue='find_user', on_message_callback=queue_find_user)
-    channel.basic_consume(queue='add_credit', on_message_callback=queue_add_credit)
-    channel.basic_consume(queue='remove_credit', on_message_callback=queue_remove_credit)
-    channel.basic_consume(queue='cancel_payment', on_message_callback=queue_cancel_payment)
-    channel.basic_consume(queue='payment_status', on_message_callback=queue_payment_status)
+    channel.basic_consume(queue='payment-queue', on_message_callback=queue_receive_message)
 
     print(" [x] Awaiting RPC requests")
     channel.start_consuming()

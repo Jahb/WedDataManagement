@@ -55,28 +55,35 @@ class PaymentQueueDispatcher(object):
             raise Exception(resp['error'])
 
     def send_create_user(self):
-        return self.send_to_queue(str(uuid.uuid4()), 'create_user', json.dumps({}))
+        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
+                'operation' : 'create_user'}))
 
     def send_find_user(self, user_id):
-        return self.send_to_queue(str(uuid.uuid4()), 'find_user', json.dumps({'user_id' : user_id}))
+        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
+                'operation' : 'find_user',
+                'user_id' : user_id}))
 
     def send_add_credit(self, user_id, amount):
-        return self.send_to_queue(str(uuid.uuid4()), 'add_credit', json.dumps({
+        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
+                'operation' : 'add_credit',
                 'user_id' : user_id,
                 'amount' : amount}))
 
     def send_remove_credit(self, user_id, order_id, amount):
-        return self.send_to_queue(str(order_id), 'remove_credit', json.dumps({
+        return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
+                'operation' : 'remove_credit',
                 'user_id' : user_id, 
                 'order_id' : order_id, 
                 'amount' : amount}))
 
     def send_cancel_payment(self, user_id, order_id):
-        return self.send_to_queue(str(order_id), 'cancel_payment', json.dumps({
+        return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
+                'operation' : 'cancel_payment',
                 'user_id' : user_id, 
                 'order_id' : order_id}))
 
     def send_payment_status(self, user_id, order_id):
-        return self.send_to_queue(str(order_id), 'paymet_status', json.dumps({
+        return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
+                'operation' : 'payment_status',
                 'user_id' : user_id, 
                 'order_id' : order_id}))

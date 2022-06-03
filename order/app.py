@@ -46,7 +46,7 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def close_db_connection():
-    db.close()
+    client.close()
 
 gateway_url = os.environ["GATEWAY_URL"]
 
@@ -121,14 +121,13 @@ def find_order(order_id):
         
         total_cost += float(order_item_response.json()["price"])
 
-    payment_resp = requests.post(f"{gateway_url}/payment/status/{order['user_id']}/{order['_id']}")
-    
-    if payment_resp.status_code >= 400:
+    payment_resp = rpc.send_payment_status(str(order['user_id']), str(order['_id']))
+    if not payment_resp['success']:
         return jsonify({"error" : f"could not find payment status!"}), 400
 
     return {
         'order_id' : str(order['_id']),
-        'paid' : payment_resp.json()['paid'],
+        'paid' : payment_resp['paid'],
         'items' : order['items'],
         'user_id' : str(order['user_id']),
         'total_cost' : total_cost
@@ -148,14 +147,10 @@ def checkout(order_id):
     # payment_resp = make_payment(order)
 
 
-    LOGGER.warn(" [x] Requesting fib(30)")
-    payment_response = rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
-    LOGGER.warn(" [.] Got %r" % payment_response)
-
-
-    # if(payment_response[1] >= 400):
-    #     #Payment fail
-    #     return jsonify({"error" : f"could not pay"}), 400
+    try:
+        rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
+    except Exception as e:
+        return jsonify({"error" : f"could not pay"}), 400
 
     order_items = order["items"]
     

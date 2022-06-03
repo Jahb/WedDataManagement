@@ -82,7 +82,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile", "--quiet"] #"--logpath", "/var/log/mongodb/mongod.log"]
     networks:
     - order-network
 
@@ -92,7 +92,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile", "--quiet"]
     networks:
     - stock-network
 
@@ -102,7 +102,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile", "--quiet"]
     networks:
     - payment-network
 
