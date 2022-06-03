@@ -18,6 +18,8 @@ import pika
 from pika.exchange_type import ExchangeType
 import threading
 
+from payment_queue_dispatcher import PaymentQueueDispatcher
+
 class InsufficientFundException(Exception):
     pass
 class DuplicateOperationException(Exception):
@@ -29,6 +31,9 @@ class UnknownException(Exception):
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
+
+sleep(10)
+rpc = PaymentQueueDispatcher()
 
 app = Flask("payment-service")
 
@@ -86,7 +91,8 @@ def find_user_impl(user_id: str):
 def add_credit(user_id: str, amount: float):
     # POST - adds funds (amount) to the user’s (user_id) account
     # Output JSON fields: “done” (true/false)
-    if not add_credit_impl(user_id, amount):
+    resp = rpc.send_add_credit(user_id, amount)
+    if not resp['success']:
         return jsonify({'error': f"User {user_id} could not be updated"}), 400
 
     return jsonify({"done": True}), 200
@@ -104,7 +110,7 @@ def remove_credit(user_id: str, order_id: str, amount: float):
     except DuplicateOperationException as e:
         return jsonify({"success" : True, "duplicate_error" : str(e)}), 222
     except Exception as e:
-        return jsonify({'error' : e}), 400
+        return jsonify({'error' : str(e)}), 400
 
 def remove_credit_impl(user_id, order_id, amount):    
     LOGGER.info(f"attempting to remove {amount}")
@@ -174,7 +180,6 @@ def payment_status_impl(order_id: str):
 
 
 def payment_queue_handler():
-    sleep(10)
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
             host='mq', 
