@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  MONGO_HOST: stock-db
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: stock-service-env-stock-mongo-env
+  name: env-stock-mongo-env

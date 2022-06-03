@@ -1,0 +1,182 @@
+#payment database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: payment-db
+  name: payment-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-db
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: payment-db
+    spec:
+      containers:
+        - args:
+            - --bind_ip_all
+            - --replSet
+            - payment
+            - --keyFile
+            - /keyfiles/payment-keyfile
+          env:
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: mongo
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: root
+          image: weddatamanagementmongo:latest
+          imagePullPolicy: IfNotPresent          
+          name: payment-db
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: payment-db
+  name: payment-db-service
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: payment-db
+  type: ClusterIP  
+
+#order database
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: order-db
+  name: order-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-db
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: order-db
+    spec:
+      containers:
+        - args:
+            - --bind_ip_all
+            - --replSet
+            - order
+            - --keyFile
+            - /keyfiles/order-keyfile
+          env:
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: mongo
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: root
+          image: weddatamanagementmongo:latest
+          imagePullPolicy: IfNotPresent
+          name: order-db
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: order-db
+  name: order-db-service
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: order-db
+  type: ClusterIP  
+
+--- 
+#order database 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: stock-db
+  name: stock-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-db
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: stock-db
+    spec:
+      containers:
+        - args:
+            - --bind_ip_all
+            - --replSet
+            - stock
+            - --keyFile
+            - /keyfiles/stock-keyfile
+          env:
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: mongo
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: root
+          image: weddatamanagementmongo:latest
+          imagePullPolicy: IfNotPresent
+          name: stock-db
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: stock-db
+  name: stock-db-service
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: stock-db
+  type: ClusterIP
+
+---
+# Mongo setup 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongosetup
+  name: mongosetup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongosetup
+  template:
+    metadata:
+      labels:
+        app: mongosetup
+    spec:
+      containers:
+        - image: weddatamanagementmongosetup:latest
+          imagePullPolicy: IfNotPresent
+          name: mongosetup
+status: {}

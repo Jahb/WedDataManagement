@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  MONGO_HOST: order-db
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: order-service-env-order-mongo-env
+  name: env-order-mongo-env

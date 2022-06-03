@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  MONGO_HOST: payment-db
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: payment-service-env-payment-mongo-env
+  name: env-payment-mongo-env

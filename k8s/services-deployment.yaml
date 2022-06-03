@@ -1,0 +1,322 @@
+#payment service
+apiVersion: v1
+data:
+  MONGO_HOST: payment-db-service
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  name: mongo-payment-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: payment-api
+  name: payment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - args:
+            - gunicorn
+            - -b
+            - 0.0.0.0:5000
+            - app:app
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-payment-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-payment-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-payment-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-payment-env
+          image: payment-service:latest
+          imagePullPolicy: IfNotPresent
+          name: payment-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: payment-api
+  name: payment-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: payment-api
+  type: ClusterIP
+---
+#stock service
+
+apiVersion: v1
+data:
+  MONGO_HOST: stock-db-service
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  name: mongo-stock-env
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: stock-api
+  name: stock-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: stock-api
+    spec:
+      containers:
+        - args:
+            - gunicorn
+            - -b
+            - 0.0.0.0:5000
+            - app:app
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-stock-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-stock-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-stock-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-stock-env
+          image: stock-service:latest
+          imagePullPolicy: IfNotPresent
+          name: stock-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: stock-api
+  name: stock-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: stock-api
+  type: ClusterIP
+---
+#order service
+apiVersion: v1
+data:
+  MONGO_HOST: order-db-service
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+  GATEWAY_URL: "localhost:30856"
+kind: ConfigMap
+metadata:
+  name: mongo-order-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: order-api
+  name: order-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: order-api
+    spec:
+      containers:
+        - args:
+            - gunicorn
+            - -b
+            - 0.0.0.0:5000
+            - app:app
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-order-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-order-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-order-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-order-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: GATEWAY_URL
+                  name: mongo-order-env                  
+          image: order-service:latest
+          imagePullPolicy: IfNotPresent
+          name: order-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: order-api
+  name: order-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: order-api
+  type: ClusterIP
+
+---
+# Gateway service 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gateway
+  name: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - image: nginx:latest
+          name: gateway
+          ports:
+            - containerPort: 80
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gateway
+  name: gateway
+spec:
+  type: NodePort
+  ports:
+    - name: "8000"
+      port: 8000
+      targetPort: 80
+  selector:
+    app: gateway
+status:
+  loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+ name: ingress-service
+ labels:
+  app: gateway
+ annotations: 
+   kubernetes.io/ingress.class: nginx
+   nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+ rules:
+   - http:
+      paths:
+        - path: /orders/?(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: order-api-service
+              port:
+                number: 5000
+        - path: /stock/?(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: stock-api-service
+              port:
+                number: 5000
+        - path: /payment/?(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: payment-api-service
+              port:
+                number: 5000
+
+
+
