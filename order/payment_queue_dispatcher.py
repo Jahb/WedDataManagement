@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from flask import jsonify
 import pika
 import uuid
 import json
@@ -9,12 +8,13 @@ LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
+
 class PaymentQueueDispatcher(object):
 
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(
-                host='mq', 
+                host='mq',
                 credentials=pika.PlainCredentials('admin', 'admin'),
                 heartbeat=600))
 
@@ -54,36 +54,21 @@ class PaymentQueueDispatcher(object):
         else:
             raise Exception(resp['error'])
 
-    def send_create_user(self):
-        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
-                'operation' : 'create_user'}))
-
-    def send_find_user(self, user_id):
-        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
-                'operation' : 'find_user',
-                'user_id' : user_id}))
-
-    def send_add_credit(self, user_id, amount):
-        return self.send_to_queue(str(uuid.uuid4()), 'payment-queue', json.dumps({
-                'operation' : 'add_credit',
-                'user_id' : user_id,
-                'amount' : amount}))
-
     def send_remove_credit(self, user_id, order_id, amount):
         return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
-                'operation' : 'remove_credit',
-                'user_id' : user_id, 
-                'order_id' : order_id, 
-                'amount' : amount}))
+            'operation': 'remove_credit',
+            'user_id': user_id,
+            'order_id': order_id,
+            'amount': amount}))
 
     def send_cancel_payment(self, user_id, order_id):
         return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
-                'operation' : 'cancel_payment',
-                'user_id' : user_id, 
-                'order_id' : order_id}))
+            'operation': 'cancel_payment',
+            'user_id': user_id,
+            'order_id': order_id}))
 
     def send_payment_status(self, user_id, order_id):
         return self.send_to_queue(str(order_id), 'payment-queue', json.dumps({
-                'operation' : 'payment_status',
-                'user_id' : user_id, 
-                'order_id' : order_id}))
+            'operation': 'payment_status',
+            'user_id': user_id,
+            'order_id': order_id}))
