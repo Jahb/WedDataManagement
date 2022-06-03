@@ -69,7 +69,26 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
 
 ***Requirements:*** You need to have docker and docker-compose installed on your machine.
 
-#### minikube (local k8s cluster)
+#### Local k8s Cluster
+
+
+
+***Requirements:*** 
+1. Make sure there is access to kubectl.
+2. Make sure there is an image of all the Dockerfiles in this project. Where the names correspond to:
+    * mongo -> weddatamanagementmongo:latest
+    * mongo-setup -> weddatamanagementmongosetup
+    * order -> order-service:latest
+    * payment -> payment-service:latest
+    * stock -> stock-service:latest
+3. run `kubectl apply -f ./k8s/database-deployment.yaml` Which spawns all the database processes and creating replicasets
+4. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway. 
+5. run `kubectl get svc` to display the availble port for which the gateway is accessible and the cluster from the outside.  
+
+TODO: The ingress controllor seems unavailble from accessing through the nginx controller.  
+
+
+*** OLD minikube (local k8s cluster) ***
 
 This setup is for local k8s testing to see if your k8s config works before deploying to the cloud. 
 First deploy your database using helm by running the `deploy-charts-minicube.sh` file (in this example the DB is Redis 
