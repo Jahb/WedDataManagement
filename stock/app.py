@@ -8,6 +8,31 @@ import pymongo
 from bson.objectid import ObjectId
 
 app = Flask("stock-service")
+########### RabbitMQ Start #############
+import pika
+
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+
+channel = connection.channel()
+
+channel.queue_declare(queue='rpc_stock_queue')
+
+# Body: {command: "functionName", args: [arg1, arg2, ...]}
+def on_request(ch, method, props, body):
+    print(" [.] Received %r" % body, flush=True)
+    
+    response = "tst"
+
+    ch.basic_publish(exchange='', routing_key=props.reply_to, properties=pika.BasicProperties(correlation_id = props.correlation_id), body=str(response))
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+channel.basic_qos(prefetch_count=1)
+channel.basic_consume(queue='rpc_stock_queue', on_message_callback=on_request)
+
+print(" [x] Awaiting RPC Stock requests", flush=True)
+channel.start_consuming()
+############ RabbitMQ  End ############
 
 client: pymongo.MongoClient = pymongo.MongoClient(
     host=os.environ['MONGO_HOST'],
@@ -22,6 +47,7 @@ stock = db["stock"]
 
 
 def close_db_connection():
+    connection.close()
     client.close()
 
 

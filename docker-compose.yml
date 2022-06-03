@@ -3,6 +3,8 @@ services:
 
   gateway:
     image: nginx:latest
+    depends_on:
+        - rabbitmq
     volumes:
       - ./gateway_nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -11,6 +13,10 @@ services:
   order-service:
     build: ./order
     image: order:latest
+    container_name: order-service
+    restart: always
+    depends_on:
+        - rabbitmq
     environment:
       - GATEWAY_URL=http://gateway:80
     command: gunicorn -b 0.0.0.0:5000 app:app
@@ -20,6 +26,10 @@ services:
   stock-service:
     build: ./stock
     image: stock:latest
+    container_name: stock-service
+    restart: always
+    depends_on:
+        - rabbitmq
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/stock_mongo.env
@@ -27,6 +37,7 @@ services:
   payment-service:
     build: ./payment
     image: user:latest
+    container_name: payment-service
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
       - env/payment_mongo.env
@@ -65,6 +76,24 @@ services:
         - payment-db
     volumes:
         - mongostatus:/data/
+  
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    # environment:
+    #   RABBITMQ_DEFAULT_USER: guest
+    #   RABBITMQ_DEFAULT_PASS: guest
+    #   RABBITMQ_ERLANG_COOKIE: guest
+    #   RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      # AMQP protocol port
+      - '5672:5672'
+      # HTTP management UI
+      - '15672:15672'
+    depends_on:
+      - mongosetup
+    # volumes:
+    #   - rabbitmq:/data/
 
 volumes:
   mongostatus:

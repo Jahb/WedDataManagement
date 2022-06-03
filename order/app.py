@@ -9,6 +9,39 @@ import pymongo
 
 import requests
 
+import pika
+import uuid
+
+############ RabbitMQ Start #############
+def on_response(ch, method, props, body):
+    if correlation_id == props.correlation_id:
+        print("Heard Response!" + body)
+        response = body
+
+def call(body):
+    response = None
+    correlation_id = str(uuid.uuid4())
+    channel.basic_publish(exchange='', routing_key='rpc_stock_queue', properties=pika.BasicProperties(reply_to=callback_queue, correlation_id=correlation_id,), body=body)
+    while response is None:
+        connection.process_data_events()
+    return response
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
+
+channel = connection.channel()
+
+result = channel.queue_declare(queue='', exclusive=True)
+callback_queue = result.method.queue
+
+channel.basic_consume(queue=callback_queue, on_message_callback=on_response, auto_ack=True)
+
+correlation_id = None
+response = None
+
+print("Trying to make a RPC call!", flush=True)
+call('{"command": "tst", "args": [123, "string"]}')
+############ RabbitMQ End ############
+
 
 gateway_url = os.environ['GATEWAY_URL']
 
@@ -29,6 +62,7 @@ cancel_order_barrier = db["cancel_order_barrier"]
 
 
 def close_db_connection():
+    connection.close()
     db.close()
 
 
