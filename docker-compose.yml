@@ -15,21 +15,21 @@ services:
       - GATEWAY_URL=http://gateway:80
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
-      - env/order_mongo.env
+      - env/order-mongo.env
 
   stock-service:
     build: ./stock
     image: stock:latest
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
-      - env/stock_mongo.env
+      - env/stock-mongo.env
 
   payment-service:
     build: ./payment
     image: user:latest
     command: gunicorn -b 0.0.0.0:5000 app:app
     env_file:
-      - env/payment_mongo.env
+      - env/payment-mongo.env
 
   order-db:
     build: ./mongo/
