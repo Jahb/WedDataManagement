@@ -65,7 +65,11 @@ atexit.register(close_db_connection)
 def create_user():
     # POST - creates a user with 0 credit
     # Output JSON fields: “user_id” - the user’s id
-    return jsonify(create_user_impl())
+    try:
+        resp = rpc.send_create_user()
+        return jsonify({'user_id': resp['user_id']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
 @app.get('/find_user/<user_id>')
@@ -74,28 +78,30 @@ def find_user(user_id: str):
     # Output JSON fields:
     #   “user_id” - the user’s id
     #   “credit” - the user’s credit
-    return jsonify(find_user_impl(user_id))
+    try:
+        resp = rpc.send_find_user(user_id)
+        return jsonify({'user_id': user_id, 'credit': resp['credit']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
 @app.post('/add_funds/<user_id>/<amount>')
 def add_credit(user_id: str, amount: float):
     # POST - adds funds (amount) to the user’s (user_id) account
     # Output JSON fields: “done” (true/false)
-    resp = rpc.send_add_credit(user_id, amount)
-    if not resp['success']:
+    try:
+        rpc.send_add_credit(user_id, amount)
+        return jsonify({"done": True}), 200
+    except Exception as e:
         return jsonify({'error': f"User {user_id} could not be updated"}), 400
-
-    return jsonify({"done": True}), 200
 
 
 @app.post('/pay/<user_id>/<order_id>/<amount>')
 def remove_credit(user_id: str, order_id: str, amount: float):
     # POST - subtracts the amount of the order from the user’s credit (returns failure if credit is not enough)
     try:
-        remove_credit_impl(user_id, order_id, amount)
+        rpc.send_remove_credit(user_id, order_id, amount)
         return jsonify({'success': True}), 200
-    except DuplicateOperationException as e:
-        return jsonify({"success": True, "duplicate_error": str(e)}), 222
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -103,17 +109,19 @@ def remove_credit(user_id: str, order_id: str, amount: float):
 @app.post('/cancel/<user_id>/<order_id>')
 def cancel_payment(user_id: str, order_id: str):
     try:
-        cancel_payment_impl(user_id, order_id)
+        rpc.send_cancel_payment(user_id, order_id)
         return jsonify(success=True)
-    except DuplicateOperationException as e:
-        return jsonify({"success": True, "duplicate_error": str(e)}), 222
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
 
 @app.post('/status/<user_id>/<order_id>')
 def payment_status(user_id: str, order_id: str):
-    return jsonify({"paid": payment_status_impl(order_id)}), 200
+    try:
+        resp = rpc.send_payment_status(user_id, order_id)
+        return jsonify({"paid": resp['paid']}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
 def create_user_impl() -> dict:
@@ -212,7 +220,7 @@ def payment_queue_handler() -> None:
                          routing_key=props.reply_to,
                          properties=pika.BasicProperties(
                              correlation_id=props.correlation_id),
-                         body=json.dumps(body | {"success": success, "duplicate": duplicate, "error": error}))
+                         body=json.dumps(body | {"success": success, "duplicate": duplicate, "error": str(error)}))
 
     def queue_receive_message(ch, method, props, req):
         body = json.loads(req.decode('utf-8'))
@@ -223,22 +231,27 @@ def payment_queue_handler() -> None:
         LOGGER.info(
             f"[payment-queue] received message {operation}({arg_info_str})")
 
-        if operation == 'create_user':
-            _queue_create_user(ch, method, props)
-        elif operation == 'find_user':
-            _queue_find_user(ch, method, props, body)
-        elif operation == 'add_credit':
-            _queue_add_credit(ch, method, props, body)
-        elif operation == 'remove_credit':
-            _queue_remove_credit(ch, method, props, body)
-        elif operation == 'cancel_payment':
-            _queue_cancel_payment(ch, method, props, body)
-        elif operation == 'payment_status':
-            _queue_payment_status(ch, method, props, body)
-        else:
-            LOGGER.error(f"Unknown operation: {operation}")
-            _on_request(ch, method, props, success=False,
-                        error=f"Unknown op {operation}")
+        try:
+            if operation == 'create_user':
+                _queue_create_user(ch, method, props)
+            elif operation == 'find_user':
+                _queue_find_user(ch, method, props, body)
+            elif operation == 'add_credit':
+                _queue_add_credit(ch, method, props, body)
+            elif operation == 'remove_credit':
+                _queue_remove_credit(ch, method, props, body)
+            elif operation == 'cancel_payment':
+                _queue_cancel_payment(ch, method, props, body)
+            elif operation == 'payment_status':
+                _queue_payment_status(ch, method, props, body)
+            else:
+                LOGGER.error(f"Unknown operation: {operation}")
+                _on_request(ch, method, props, success=False,
+                            error=f"Unknown op {operation}")
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        except Exception as e:
+            LOGGER.warn(f"[payment-queue] {operation} raised {e}")
+            _on_request(ch, method, props, success=False, error=e)
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
     def _queue_create_user(ch, method, props):
@@ -275,18 +288,13 @@ def payment_queue_handler() -> None:
             _on_request(ch, method, props)
             ch.basic_ack(delivery_tag=method.delivery_tag)
         except DuplicateOperationException as e:
-            LOGGER.info(
-                f"[payment-queue] remove_credit ACK but duplicate ({e})")
             _on_request(ch, method, props, duplicate=True)
             ch.basic_ack(delivery_tag=method.delivery_tag)
         except InsufficientFundException as e:
-            LOGGER.info(f"[payment-queue] remove_credit NACK because of {e}")
-            _on_request(ch, method, props, success=False, error=str(e))
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        except Exception as e:
-            LOGGER.info(f"[payment-queue] remove_credit NACK because of {e}")
-            _on_request(ch, method, props, success=False, error=str(e))
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            LOGGER.info(
+                f"[payment-queue] remove_credit could not succeed because of {e}")
+            _on_request(ch, method, props, success=False, error=e)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _queue_cancel_payment(ch, method, props, body):
         user_id = str(body['user_id'])
@@ -294,17 +302,11 @@ def payment_queue_handler() -> None:
 
         try:
             cancel_payment_impl(user_id, order_id)
-            LOGGER.info(f"[] cancel_payment ACK")
             _on_request(ch, method, props)
             ch.basic_ack(delivery_tag=method.delivery_tag)
         except DuplicateOperationException as e:
-            LOGGER.info(f"[] cancel_payment ACK but duplicate ({e})")
             _on_request(ch, method, props, duplicate=True)
             ch.basic_ack(delivery_tag=method.delivery_tag)
-        except Exception as e:
-            LOGGER.info(f"[] cancel_payment NACK because of {e}")
-            _on_request(ch, method, props, success=False, error=str(e))
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
     def _queue_payment_status(ch, method, props, body):
         # user_id = str(body['user_id'])

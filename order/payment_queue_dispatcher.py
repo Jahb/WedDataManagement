@@ -30,9 +30,6 @@ class PaymentQueueDispatcher(object):
 
     def on_response(self, ch, method, props, body):
         if self.corr_id == props.correlation_id:
-            LOGGER.info(props)
-            LOGGER.info(method)
-
             self.response = body
 
     def send_to_queue(self, corr_id, routing_key, body):

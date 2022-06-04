@@ -19,7 +19,7 @@ services:
   rabbitmq: # login guest:guest
     container_name: mq
     hostname: mq
-    image: rabbitmq
+    image: rabbitmq:management
     environment:
       - RABBITMQ_DEFAULT_USER=admin
       - RABBITMQ_DEFAULT_PASS=admin
@@ -43,7 +43,7 @@ services:
     image: order:latest
     environment:
       - GATEWAY_URL=http://gateway:80
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: gunicorn -b 0.0.0.0:5000 app:app --workers 4
     env_file:
       - env/order_mongo.env
     depends_on:
@@ -55,7 +55,7 @@ services:
   stock-service:
     build: ./stock
     image: stock:latest
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: gunicorn -b 0.0.0.0:5000 app:app --workers 4
     env_file:
       - env/stock_mongo.env
     depends_on:
@@ -67,7 +67,7 @@ services:
   payment-service:
     build: ./payment
     image: user:latest
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: gunicorn -b 0.0.0.0:5000 app:app --workers 4
     env_file:
       - env/payment_mongo.env
     depends_on:
