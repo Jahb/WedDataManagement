@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import pika
-import uuid
 import json
 import logging
 
