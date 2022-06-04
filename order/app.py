@@ -1,3 +1,4 @@
+from http import HTTPStatus
 import requests
 import os
 import atexit
@@ -121,8 +122,8 @@ async def find_order(order_id):
 
     payment_resp = await rpc.send_payment_status(
         str(order['user_id']), str(order['_id']))
-    if not payment_resp['success']:
-        raise HTTPException(400, f"could not find payment status!")
+    if 'error' in payment_resp:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not find payment status: {payment_resp['error']}")
 
     return {
         'order_id': str(order['_id']),
@@ -141,11 +142,11 @@ async def checkout(order_id):
 
     order = await find_order(order_id)
 
-    try:
-        await rpc.send_remove_credit(
-            order['user_id'], order_id, float(order['total_cost']))
-    except Exception as e:
-        raise HTTPException(400, f"could not pay")
+    payment_resp = await rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
+    if 'error' in payment_resp:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not make payment attempt {payment_resp['error']}")
+    if not payment_resp['done']:
+        raise HTTPException(HTTPStatus.PRECONDITION_FAILED, "insufficient funds for payment")
 
     order_items = order["items"]
 
@@ -158,10 +159,9 @@ async def checkout(order_id):
             f"{gateway_url}/stock/subtract/{order_item}/{count}")
         if (resp.status_code >= 400):
             # Attempt to undo what has happened so far. Stock subtraction failed.
-            try:
-                await rpc.send_cancel_payment(order['user_id'], order_id)
-            except Exception as e:
-                raise HTTPException(400, f"could not undo. Refund error: {e}")
+            refund_response = await rpc.send_cancel_payment(order['user_id'], order_id)
+            if 'error' in refund_response:
+                raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not undo. Refund error: {refund_response['error']}")
 
             stock_resp = undo_stock_update(completed_items)
             if stock_resp[1] >= 400:

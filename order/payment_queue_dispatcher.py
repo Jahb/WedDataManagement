@@ -31,7 +31,7 @@ class PaymentQueueDispatcher(object):
         )
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(exclusive=True)
-        await self.callback_queue.consume(self.on_response)
+        await self.callback_queue.consume(self.on_response, no_ack=True)
 
         return self
 
@@ -42,7 +42,7 @@ class PaymentQueueDispatcher(object):
             return
 
         future: asyncio.Future = self.futures.pop(message.correlation_id)
-        future.set_result(message.body)
+        future.set_result(message)
     
     async def send(self, *, operation, **kwargs) -> Any:
         correlation_id = str(uuid.uuid4())
@@ -60,11 +60,9 @@ class PaymentQueueDispatcher(object):
             routing_key="payment-queue",
         )
 
-        resp = await future
-        result = json.loads(resp.decode())
-        if 'error' in result:
-            raise result['error']
-        return result
+        message: AbstractIncomingMessage = await future
+        message.ack()
+        return json.loads(message.body.decode())
 
     async def send_create_user(self):
         return await self.send(operation='create_user')

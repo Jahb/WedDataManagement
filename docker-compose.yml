@@ -43,7 +43,7 @@ services:
     image: order:latest
     environment:
       - GATEWAY_URL=http://gateway:80
-    command: uvicorn --host 0.0.0.0 --port 5000 --workers 4 app:app 
+    command: uvicorn --host 0.0.0.0 --port 5000 --workers 2 app:app 
     env_file:
       - env/order_mongo.env
     depends_on:
@@ -55,7 +55,7 @@ services:
   stock-service:
     build: ./stock
     image: stock:latest
-    command: gunicorn -b 0.0.0.0:5000 app:app --workers 4
+    command: gunicorn -b 0.0.0.0:5000 app:app --workers 2
     env_file:
       - env/stock_mongo.env
     depends_on:
@@ -67,7 +67,7 @@ services:
   payment-service:
     build: ./payment
     image: user:latest
-    command: uvicorn --host 0.0.0.0 --port 5000 --workers 4 payment:app 
+    command: uvicorn --host 0.0.0.0 --port 5000 --workers 2 payment:app 
     env_file:
       - env/payment_mongo.env
     depends_on:
