@@ -26,19 +26,24 @@ def subtract_stock(item_id: str, amount: int) -> int:
 #   PAYMENT MICROSERVICE FUNCTIONS
 ########################################################################################################################
 def payment_pay(user_id: str, order_id: str, amount: float) -> int:
-    return requests.post(f"{PAYMENT_URL}/payment/pay/{user_id}/{order_id}/{amount}").status_code
-
+    result = requests.post(f"{PAYMENT_URL}/payment/pay/{user_id}/{order_id}/{amount}")
+    print(result)
+    return result.status_code
 
 def create_user() -> dict:
-    return requests.post(f"{PAYMENT_URL}/payment/create_user").json()
-
+    result = requests.post(f"{PAYMENT_URL}/payment/create_user")
+    print(result.json())
+    return result.json()
 
 def find_user(user_id: str) -> dict:
-    return requests.get(f"{PAYMENT_URL}/payment/find_user/{user_id}").json()
-
+    result = requests.get(f"{PAYMENT_URL}/payment/find_user/{user_id}")
+    print(result.json())
+    return result.json()
 
 def add_credit_to_user(user_id: str, amount: float) -> int:
-    return requests.post(f"{PAYMENT_URL}/payment/add_funds/{user_id}/{amount}").status_code
+    result = requests.post(f"{PAYMENT_URL}/payment/add_funds/{user_id}/{amount}")
+    print(result)
+    return result.status_code
 
 
 ########################################################################################################################

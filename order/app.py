@@ -16,8 +16,7 @@ LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
-sleep(10)
-rpc = PaymentQueueDispatcher()
+rpc: PaymentQueueDispatcher
 
 
 app = FastAPI(title="order-service")
@@ -41,6 +40,12 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 def close_db_connection():
     client.close()
 
+
+@app.on_event('startup')
+async def startup():
+    sleep(10)
+    global rpc
+    rpc = await PaymentQueueDispatcher().connect()
 
 gateway_url = os.environ["GATEWAY_URL"]
 
@@ -93,7 +98,7 @@ def remove_item(order_id, item_id):
 
 
 @app.get('/find/{order_id}')
-def find_order(order_id):
+async def find_order(order_id):
     # GET - retrieves the information of an order (id, payment status, items included and user id)
     # Output JSON fields:
     # “order_id”  - the order’s id
@@ -114,7 +119,7 @@ def find_order(order_id):
 
         total_cost += float(order_item_response.json()["price"])
 
-    payment_resp = rpc.send_payment_status(
+    payment_resp = await rpc.send_payment_status(
         str(order['user_id']), str(order['_id']))
     if not payment_resp['success']:
         raise HTTPException(400, f"could not find payment status!")
@@ -129,15 +134,15 @@ def find_order(order_id):
 
 
 @app.post('/checkout/{order_id}')
-def checkout(order_id):
+async def checkout(order_id):
     # POST - makes the payment (via calling the payment service),
     # subtracts the stock (via the stock service)
     # and returns a status (success/failure).
 
-    order = find_order(order_id)
+    order = await find_order(order_id)
 
     try:
-        rpc.send_remove_credit(
+        await rpc.send_remove_credit(
             order['user_id'], order_id, float(order['total_cost']))
     except Exception as e:
         raise HTTPException(400, f"could not pay")
@@ -154,7 +159,7 @@ def checkout(order_id):
         if (resp.status_code >= 400):
             # Attempt to undo what has happened so far. Stock subtraction failed.
             try:
-                rpc.send_cancel_payment(order['user_id'], order_id)
+                await rpc.send_cancel_payment(order['user_id'], order_id)
             except Exception as e:
                 raise HTTPException(400, f"could not undo. Refund error: {e}")
 
