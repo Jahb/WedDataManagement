@@ -26,8 +26,9 @@ spec:
         component: stock
     spec:
       containers:
-        - name: stock
+        - name: stock-service
           image: stock:latest
+          imagePullPolicy: IfNotPresent
           resources:
             limits:
               memory: "1Gi"
@@ -41,8 +42,10 @@ spec:
             - containerPort: 5000
           env:
             - name: MONGO_HOST
-              value: mongo-master
+              value: stock-db
             - name: MONGO_PORT
               value: '27017'
+            - name: MONGO_USERNAME
+              value: "root"
             - name: MONGO_PASSWORD
               value: "mongo"

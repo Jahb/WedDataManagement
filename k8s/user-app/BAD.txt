@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service
+  name: user-service
 spec:
   type: ClusterIP
   selector:
-    component: order
+    component: user
   ports:
     - port: 5000
       name: http
@@ -14,21 +14,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-deployment
+  name: user-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: order
+      component: user
   template:
     metadata:
       labels:
-        component: order
+        component: user
     spec:
       containers:
-        - name: order-service
-          image: order:latest
-          imagePullPolicy: IfNotPresent
+        - name: user-service
+          image: user:latest
           resources:
             limits:
               memory: "1Gi"
@@ -41,14 +40,8 @@ spec:
           ports:
             - containerPort: 5000
           env:
-            - name: GATEWAY_URL
-              value: http://gateway:80
-            - name: USER_SERVICE_URL
-              value: "user-service"
-            - name: STOCK_SERVICE_URL
-              value: "stock-service"
             - name: MONGO_HOST
-              value: order-db
+              value: -db
             - name: MONGO_PORT
               value: '27017'
             - name: MONGO_USERNAME

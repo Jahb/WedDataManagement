@@ -74,6 +74,9 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
 This setup is for local k8s testing to see if your k8s config works before deploying to the cloud. 
 First deploy your database using helm by running the `deploy-charts-minicube.sh` file (in this example the DB is Redis 
 but you can find any database you want in https://artifacthub.io/ and adapt the script). Then adapt the k8s configuration files in the
+
+(For windows atleast -jah) `minikube image load stock:latest` for every docker container
+
 `\k8s` folder to mach your system and then run `kubectl apply -f .` in the k8s folder. 
 
 ***Requirements:*** You need to have minikube (with ingress enabled) and helm installed on your machine.

@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: user-service
+  name: payment-service
 spec:
   type: ClusterIP
   selector:
-    component: user
+    component: payment
   ports:
     - port: 5000
       name: http
@@ -14,20 +14,21 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user-deployment
+  name: payment-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: user
+      component: payment
   template:
     metadata:
       labels:
-        component: user
+        component: payment
     spec:
       containers:
-        - name: user
+        - name: payment-service
           image: user:latest
+          imagePullPolicy: IfNotPresent
           resources:
             limits:
               memory: "1Gi"
@@ -40,9 +41,15 @@ spec:
           ports:
             - containerPort: 5000
           env:
+            - name: USER_SERVICE_URL
+              value: "user-service"
+            - name: STOCK_SERVICE_URL
+              value: "stock-service"
             - name: MONGO_HOST
-              value: mongo-master
+              value: payment-db
             - name: MONGO_PORT
               value: '27017'
+            - name: MONGO_USERNAME
+              value: "root"
             - name: MONGO_PASSWORD
               value: "mongo"
