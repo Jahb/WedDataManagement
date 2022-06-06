@@ -4,7 +4,6 @@ import utils as tu
 
 
 class TestMicroservices(unittest.TestCase):
-    
     def test_stock(self):
         # Test /stock/item/create/<price>
         item: dict = tu.create_item(5)
