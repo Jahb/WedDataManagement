@@ -189,6 +189,8 @@ spec:
             - -b
             - 0.0.0.0:5000
             - app:app
+          ports:
+            - containerPort: 5000            
           env:
             - name: MONGO_HOST
               valueFrom:
@@ -271,13 +273,13 @@ kind: Service
 metadata:
   labels:
     app: gateway
-  name: gateway
+  name: gateway-service
 spec:
   type: NodePort
   ports:
     - name: "8000"
       port: 8000
-      targetPort: 80
+      targetPort: 80      
   selector:
     app: gateway
 status:
@@ -287,36 +289,41 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
  name: ingress-service
- labels:
-  app: gateway
  annotations: 
    kubernetes.io/ingress.class: nginx
    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
  rules:
-   - http:
-      paths:
-        - path: /orders/?(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: order-api-service
-              port:
-                number: 5000
-        - path: /stock/?(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: stock-api-service
-              port:
-                number: 5000
-        - path: /payment/?(.*)
-          pathType: Prefix
-          backend:
-            service:
-              name: payment-api-service
-              port:
-                number: 5000
-
+ - host: webdb.localdev.me
+   http:
+    paths:
+     - path: /
+       pathType: Prefix
+       backend:
+        service:
+          name: gateway-service
+          port:
+            number: 8000      
+     - path: /orders/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: order-api-service
+          port:
+            number: 5000
+     - path: /stock/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: stock-api-service
+          port:
+            number: 5000
+     - path: /payment/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: payment-api-service
+          port:
+            number: 5000
 
 
