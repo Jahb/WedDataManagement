@@ -61,7 +61,6 @@ class PaymentQueueDispatcher(object):
         )
 
         message: AbstractIncomingMessage = await future
-        message.ack()
         return json.loads(message.body.decode())
 
     async def send_create_user(self):

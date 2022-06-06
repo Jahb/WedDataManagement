@@ -15,7 +15,7 @@ LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
 LOGGER = logging.getLogger(__name__)
 
 
-class PaymentQueueDispatcher(object):
+class StockQueueDispatcher(object):
     connection: AbstractConnection
     channel: AbstractChannel
     callback_queue: AbstractQueue
@@ -25,7 +25,7 @@ class PaymentQueueDispatcher(object):
         self.futures: MutableMapping[str, asyncio.Future] = {}
         self.loop = asyncio.get_running_loop()
 
-    async def connect(self) -> "PaymentQueueDispatcher":
+    async def connect(self) -> "StockQueueDispatcher":
         self.connection = await connect(
             "amqp://admin:admin@mq/", loop=self.loop,
         )
@@ -57,26 +57,23 @@ class PaymentQueueDispatcher(object):
                 correlation_id=correlation_id,
                 reply_to=self.callback_queue.name,
             ),
-            routing_key="payment-queue",
+            routing_key="stock-queue",
         )
 
         message: AbstractIncomingMessage = await future
+        # await message.ack()
         return json.loads(message.body.decode())
 
-    async def send_create_user(self):
-        return await self.send(operation='create_user')
+    async def send_create_item(self, price: float):
+        return await self.send(operation='create_item', price=price)
 
-    async def send_find_user(self, user_id):
-        return await self.send(operation='find_user', user_id=user_id)
+    async def send_find_item(self, item_id):
+        return await self.send(operation='find_item', item_id=item_id)
 
-    async def send_add_credit(self, user_id, amount):
-        return await self.send(operation='add_credit', user_id=user_id, amount=amount)
+    async def send_add_stock(self, item_id, amount):
+        return await self.send(operation='add_stock', item_id=item_id, amount=amount)
 
-    async def send_remove_credit(self, user_id, order_id, amount):
-        return await self.send(operation='remove_credit', user_id=user_id, order_id=order_id, amount=amount)
+    async def send_remove_stock(self, item_id, amount):
+        return await self.send(operation='remove_stock', item_id=item_id, amount=amount)
 
-    async def send_cancel_payment(self, user_id, order_id):
-        return await self.send(operation='cancel_payment', user_id=user_id, order_id=order_id)
-
-    async def send_payment_status(self, user_id, order_id):
-        return await self.send(operation='payment_status', user_id=user_id, order_id=order_id)
+    # TODO: create a send_remove_multiple_stock(self, item_dict, idem_key)
