@@ -162,19 +162,31 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
             try:
                 barrier.insert_one({"_id": ObjectId(idem_key)})
 
-                for item_id, amount in item_dict.items():
+                for item_id, count in item_dict.items():
                     item = find_item_impl(item_id)
-                    if item["stock"] < float(amount):
+                    if item["stock"] < float(count):
                         sufficient_amount = False
                         session.abort_transaction()
 
-                    if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(amount)}}).modified_count != 1:
+                    if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(count)}}).modified_count != 1:
                         session.abort_transaction()
                         raise UnknownException()
             except pymongo.errors.DuplicateKeyError as e:
                 return {'done' : True}
 
     return {'done': sufficient_amount}
+
+
+def get_total_cost_impl(item_dict: dict[str, int]):
+    LOGGER.info("Removing stocks in one transaction: %r", item_dict)
+    total_price = 0.0
+    with client.start_session() as session:
+        with session.start_transaction():
+            for item_id, count in item_dict.items():
+                item = find_item_impl(item_id)
+                total_price += float(item['price']) * count
+
+    return {'total_cost': total_price}
 
 async def stock_queue_handler() -> None:
     # should only throw when receiving an unknown operation
@@ -216,6 +228,8 @@ async def stock_queue_handler() -> None:
                         resp = remove_stock_impl(req['item_id'], req['amount'])
                     elif operation == 'remove_multiple_stock':
                         resp = remove_multiple_stocks_impl(req['item_dict'], req['idem_key'])
+                    elif operation == 'total_cost':
+                        resp = get_total_cost_impl(req['item_dict'])
                     else:
                         raise Exception(f"Unknown operation {operation}")
                     await exchange.publish(

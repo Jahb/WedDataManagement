@@ -112,21 +112,13 @@ async def find_order(order_id):
     order = orders.find_one({"_id": ObjectId(order_id)})
     order_items = order["items"]
 
-    async def get_cost(order_item, count):
-        resp = await rpc.send_find_item(order_item)
-        if 'error' in resp:
-            raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
-                                f"could not find item info: {payment_resp['error']}")
-        LOGGER.debug(
-            f"get_cost: {count} * ${resp['price']} for item {order_item}")
-        return float(resp['price']) * count
+    counted_items = dict(Counter(order_items))
+    cost_response = await rpc.send_get_total_cost(counted_items)
+    if 'error' in cost_response:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not find item info: {cost_response['error']}")
 
-    # the order has n order_items of m unique items
-    # send out m requests simultaneously and gather them up
-    counted_items = Counter(order_items)
-    total_cost = sum(await asyncio.gather(*map(
-        lambda item_id: get_cost(item_id, counted_items[item_id]),
-        counted_items)))
+    total_cost = float(cost_response['total_cost'])
 
     payment_resp = await rpc.send_payment_status(
         str(order['user_id']), str(order['_id']))

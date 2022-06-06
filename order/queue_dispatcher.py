@@ -96,4 +96,7 @@ class QueueDispatcher(object):
     async def send_remove_multiple_stocks(self, item_dict, idem_key):
         return await self.send('stock-queue', operation='remove_multiple_stock', item_dict=item_dict, idem_key=idem_key)
 
+    async def send_get_total_cost(self, item_dict):
+        return await self.send('stock-queue', operation='total_cost', item_dict=item_dict)
+
     # TODO: create a "send_sum_item_cost(self, item_list)"
