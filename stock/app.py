@@ -156,7 +156,6 @@ def remove_stock_impl(item_id: str, amount: float):
 
 def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
     LOGGER.info("Removing stocks in one transaction: %r", item_dict)
-    sufficient_amount = True
     with client.start_session() as session:
         with session.start_transaction():
             try:
@@ -165,8 +164,9 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
                 for item_id, count in item_dict.items():
                     item = find_item_impl(item_id)
                     if item["stock"] < float(count):
-                        sufficient_amount = False
+                        LOGGER.info(f"insufficient stock. have {item['stock']}, want {count} for {item_id}")
                         session.abort_transaction()
+                        return {'done': False}
 
                     if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(count)}}).modified_count != 1:
                         session.abort_transaction()
@@ -174,7 +174,7 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
             except pymongo.errors.DuplicateKeyError as e:
                 return {'done' : True}
 
-    return {'done': sufficient_amount}
+    return {'done': True}
 
 
 def get_total_cost_impl(item_dict: dict[str, int]):
