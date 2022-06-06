@@ -39,6 +39,8 @@ client: pymongo.MongoClient = pymongo.MongoClient(
 db = client["webDataManagement"]
 
 stock = db["stock"]
+barrier = db["stock_barrier"]
+
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
@@ -152,6 +154,27 @@ def remove_stock_impl(item_id: str, amount: float):
 
     raise UnknownException()
 
+def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
+    LOGGER.info("Removing stocks in one transaction: %r", item_dict)
+    sufficient_amount = True
+    with client.start_session() as session:
+        with session.start_transaction():
+            try:
+                barrier.insert_one({"_id": ObjectId(idem_key)})
+
+                for item_id, amount in item_dict.items():
+                    item = find_item_impl(item_id)
+                    if item["stock"] < float(amount):
+                        sufficient_amount = False
+                        session.abort_transaction()
+
+                    if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(amount)}}).modified_count != 1:
+                        session.abort_transaction()
+                        raise UnknownException()
+            except pymongo.errors.DuplicateKeyError as e:
+                return {'done' : True}
+
+    return {'done': sufficient_amount}
 
 async def stock_queue_handler() -> None:
     # should only throw when receiving an unknown operation
@@ -191,6 +214,8 @@ async def stock_queue_handler() -> None:
                         resp = add_stock_impl(req['item_id'], req['amount'])
                     elif operation == 'remove_stock':
                         resp = remove_stock_impl(req['item_id'], req['amount'])
+                    elif operation == 'remove_multiple_stock':
+                        resp = remove_multiple_stocks_impl(req['item_dict'], req['idem_key'])
                     else:
                         raise Exception(f"Unknown operation {operation}")
                     await exchange.publish(

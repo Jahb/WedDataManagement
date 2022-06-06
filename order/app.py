@@ -1,6 +1,4 @@
 from http import HTTPStatus
-from itertools import count
-import requests
 import os
 import atexit
 from bson import ObjectId
@@ -152,8 +150,10 @@ async def checkout(order_id):
     # and returns a status (success/failure).
 
     order = await find_order(order_id)
+    user_id = str(order['user_id'])
+    total_cost = float(order['total_cost'])
 
-    payment_resp = await rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
+    payment_resp = await rpc.send_remove_credit(user_id, order_id, total_cost)
     if 'error' in payment_resp:
         raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
                             f"could not make payment attempt {payment_resp['error']}")
@@ -161,48 +161,20 @@ async def checkout(order_id):
         raise HTTPException(HTTPStatus.PRECONDITION_FAILED,
                             "insufficient funds for payment")
 
-    order_items = order["items"]
+    async def refund():
+        refund_resp = await rpc.send_add_credit(user_id, total_cost)
+        if 'error' in refund_resp or not refund_resp['done']:
+            LOGGER.exception("refund failed! %r", refund_resp.get('error'))
+            raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, "refund failed!")
 
-    order_items_counts = Counter(order_items)
-
-    completed_items = []
-
-    for order_item, count in order_items_counts.most_common():
-        resp = requests.post(
-            f"{gateway_url}/stock/subtract/{order_item}/{count}")
-        if (resp.status_code >= 400):
-            # Attempt to undo what has happened so far. Stock subtraction failed.
-            refund_response = await rpc.send_cancel_payment(order['user_id'], order_id)
-            if 'error' in refund_response:
-                raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
-                                    f"could not undo. Refund error: {refund_response['error']}")
-
-            stock_resp = undo_stock_update(completed_items)
-            if stock_resp[1] >= 400:
-                raise HTTPException(
-                    400, f"could not undo. StockUndo Status Code: {stock_resp[1]}")
-            raise HTTPException(
-                444, f"check out failed due to insufficient funds or stock. successfully reverted")
-        else:
-            completed_items.append((order_item, count))
-
-    return {"success": True}
-
-
-def undo_payment(order):
-    resp = requests.post(
-        f"{gateway_url}/payment/add_funds/{order['user_id']}/{order['total_cost']}")
-    if (resp.status_code >= 400):
-        raise HTTPException(resp.status_code, f"could not undo")
-    else:
-        return {"success": True}
-
-
-def undo_stock_update(completed_items):
-    for completed_item, count in completed_items:
-        resp = requests.post(
-            f"{gateway_url}/stock/add/{completed_item}/{count}")
-        if (resp.status_code >= 400):
-            raise HTTPException(
-                400, f"could not subtract stock and Failed to rollback previous stock updates.")
-    return {"success": True}
+    order_items_counts = dict(Counter(order["items"]))
+    stock_resp = await rpc.send_remove_multiple_stocks(order_items_counts, order_id)
+    if 'error' in stock_resp:
+        await refund()
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not deduct stocks because of error {stock_resp['error']}")
+    if not stock_resp['done']:
+        await refund()
+        raise HTTPException(HTTPStatus.PRECONDITION_FAILED,
+                            "could not deduct stocks because of insufficient quantities")
+    return {"done": True}
