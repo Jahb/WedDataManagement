@@ -8,9 +8,9 @@ class TestMicroservices(unittest.TestCase):
         # Test /stock/item/create/<price>
         item: dict = tu.create_item(5)
 
-        self.assertTrue('_id' in item)
+        self.assertTrue('item_id' in item)
 
-        item_id: str = item['_id']
+        item_id: str = item['item_id']
 
         # Test /stock/find/<item_id>
         item: dict = tu.find_item(item_id)

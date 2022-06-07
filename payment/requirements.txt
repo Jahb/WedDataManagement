@@ -1,4 +1,4 @@
-uvicorn==0.17.6
+aio_pika==8.0.3
 fastapi==0.78.0
 pymongo==4.1.1
-aio_pika==8.0.3
+uvicorn==0.17.6

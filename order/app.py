@@ -1,5 +1,4 @@
 from http import HTTPStatus
-import requests
 import os
 import atexit
 from bson import ObjectId
@@ -8,16 +7,17 @@ from collections import Counter
 from fastapi import FastAPI, HTTPException
 import pymongo
 
-from payment_queue_dispatcher import PaymentQueueDispatcher
+from queue_dispatcher import QueueDispatcher
 
 from time import sleep
 import logging
+import asyncio
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
-rpc: PaymentQueueDispatcher
+rpc: QueueDispatcher
 
 
 app = FastAPI(title="order-service")
@@ -46,7 +46,7 @@ def close_db_connection():
 async def startup():
     sleep(10)
     global rpc
-    rpc = await PaymentQueueDispatcher().connect()
+    rpc = await QueueDispatcher().connect()
 
 gateway_url = os.environ["GATEWAY_URL"]
 
@@ -81,7 +81,8 @@ def add_item(order_id, item_id):
         {"_id": ObjectId(order_id)},
         {"$push": {"items": item_id}}
     ).modified_count != 1:
-        raise HTTPException(400, f"Could not add {item_id} to order {order_id}")
+        raise HTTPException(
+            400, f"Could not add {item_id} to order {order_id}")
 
     return {"success": True}
 
@@ -93,7 +94,8 @@ def remove_item(order_id, item_id):
         {"_id": ObjectId(order_id)},
         {"$pull": {"items": item_id}}
     ).modified_count != 1:
-        raise HTTPException(400, f"Could not remove {item_id} to order {order_id}")
+        raise HTTPException(
+            400, f"Could not remove {item_id} to order {order_id}")
 
     return {"success": True}
 
@@ -110,20 +112,19 @@ async def find_order(order_id):
     order = orders.find_one({"_id": ObjectId(order_id)})
     order_items = order["items"]
 
-    total_cost = 0  # TODO this could def be made better
-    for order_item in order_items:
-        order_item_response = requests.get(
-            f"{gateway_url}/stock/find/{order_item}")
+    counted_items = dict(Counter(order_items))
+    cost_response = await rpc.send_get_total_cost(counted_items)
+    if 'error' in cost_response:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not find item info: {cost_response['error']}")
 
-        if order_item_response.status_code >= 400:
-            raise HTTPException(400, f"could not find item to calculate total cost!")
-
-        total_cost += float(order_item_response.json()["price"])
+    total_cost = float(cost_response['total_cost'])
 
     payment_resp = await rpc.send_payment_status(
         str(order['user_id']), str(order['_id']))
     if 'error' in payment_resp:
-        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not find payment status: {payment_resp['error']}")
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not find payment status: {payment_resp['error']}")
 
     return {
         'order_id': str(order['_id']),
@@ -141,51 +142,31 @@ async def checkout(order_id):
     # and returns a status (success/failure).
 
     order = await find_order(order_id)
+    user_id = str(order['user_id'])
+    total_cost = float(order['total_cost'])
 
-    payment_resp = await rpc.send_remove_credit(order['user_id'], order_id, float(order['total_cost']))
+    payment_resp = await rpc.send_remove_credit(user_id, order_id, total_cost)
     if 'error' in payment_resp:
-        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not make payment attempt {payment_resp['error']}")
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not make payment attempt {payment_resp['error']}")
     if not payment_resp['done']:
-        raise HTTPException(HTTPStatus.PRECONDITION_FAILED, "insufficient funds for payment")
+        raise HTTPException(HTTPStatus.PRECONDITION_FAILED,
+                            "insufficient funds for payment")
 
-    order_items = order["items"]
+    async def refund():
+        refund_resp = await rpc.send_add_credit(user_id, total_cost)
+        if 'error' in refund_resp or not refund_resp['done']:
+            LOGGER.exception("refund failed! %r", refund_resp.get('error'))
+            raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, "refund failed!")
 
-    order_items_counts = Counter(order_items)
-
-    completed_items = []
-
-    for order_item, count in order_items_counts.most_common():
-        resp = requests.post(
-            f"{gateway_url}/stock/subtract/{order_item}/{count}")
-        if (resp.status_code >= 400):
-            # Attempt to undo what has happened so far. Stock subtraction failed.
-            refund_response = await rpc.send_cancel_payment(order['user_id'], order_id)
-            if 'error' in refund_response:
-                raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"could not undo. Refund error: {refund_response['error']}")
-
-            stock_resp = undo_stock_update(completed_items)
-            if stock_resp[1] >= 400:
-                raise HTTPException(400, f"could not undo. StockUndo Status Code: {stock_resp[1]}")
-            raise HTTPException(444, f"check out failed due to insufficient funds or stock. successfully reverted")
-        else:
-            completed_items.append((order_item, count))
-
-    return {"success": True}
-
-
-def undo_payment(order):
-    resp = requests.post(
-        f"{gateway_url}/payment/add_funds/{order['user_id']}/{order['total_cost']}")
-    if (resp.status_code >= 400):
-        raise HTTPException(resp.status_code, f"could not undo")
-    else:
-        return {"success": True}
-
-
-def undo_stock_update(completed_items):
-    for completed_item, count in completed_items:
-        resp = requests.post(
-            f"{gateway_url}/stock/add/{completed_item}/{count}")
-        if (resp.status_code >= 400):
-            raise HTTPException(400, f"could not subtract stock and Failed to rollback previous stock updates.")
-    return {"success": True}
+    order_items_counts = dict(Counter(order["items"]))
+    stock_resp = await rpc.send_remove_multiple_stocks(order_items_counts, order_id)
+    if 'error' in stock_resp:
+        await refund()
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not deduct stocks because of error {stock_resp['error']}")
+    if not stock_resp['done']:
+        await refund()
+        raise HTTPException(HTTPStatus.PRECONDITION_FAILED,
+                            "could not deduct stocks because of insufficient quantities")
+    return {"done": True}
