@@ -154,7 +154,7 @@ async def checkout(order_id):
                             "insufficient funds for payment")
 
     async def refund():
-        refund_resp = await rpc.send_add_credit(user_id, total_cost)
+        refund_resp = await rpc.send_cancel_payment(user_id, order_id)
         if 'error' in refund_resp or not refund_resp['done']:
             LOGGER.exception("refund failed! %r", refund_resp.get('error'))
             raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, "refund failed!")
