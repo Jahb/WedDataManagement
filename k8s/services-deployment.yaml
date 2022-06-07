@@ -161,7 +161,7 @@ data:
   MONGO_PASSWORD: mongo
   MONGO_PORT: "27017"
   MONGO_USERNAME: root
-  GATEWAY_URL: "localhost:30856"
+  GATEWAY_URL: "http://webdb.localdev.me:8080"
 kind: ConfigMap
 metadata:
   name: mongo-order-env

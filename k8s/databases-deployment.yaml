@@ -6,7 +6,6 @@ metadata:
     app: payment-db
   name: payment-db
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: payment-db
@@ -31,6 +30,8 @@ spec:
           image: weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent          
           name: payment-db
+          ports:
+            - containerPort: 27017          
           resources: {}
       restartPolicy: Always
 status: {}
@@ -59,7 +60,6 @@ metadata:
     app: order-db
   name: order-db
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: order-db
@@ -84,6 +84,8 @@ spec:
           image: weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent
           name: order-db
+          ports:
+            - containerPort: 27017          
           resources: {}
       restartPolicy: Always
 status: {}
@@ -112,7 +114,6 @@ metadata:
     app: stock-db
   name: stock-db
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: stock-db
@@ -137,6 +138,8 @@ spec:
           image: weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent
           name: stock-db
+          ports:
+            - containerPort: 27017
           resources: {}
       restartPolicy: Always
 status: {}
@@ -150,11 +153,9 @@ metadata:
 spec:
   ports:
   - port: 27017
-    protocol: TCP
     targetPort: 27017
   selector:
     app: stock-db
-  type: ClusterIP
 
 ---
 # Mongo setup 
