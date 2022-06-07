@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-WORKDIR /home/flask-app
+WORKDIR /home/fastapi-app
 
 COPY ./requirements.txt .
 

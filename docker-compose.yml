@@ -7,29 +7,74 @@ services:
       - ./gateway_nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8000:80"
+    networks:
+    - order-network
+    - stock-network
+    - payment-network
+    depends_on:
+      - order-service
+      - stock-service
+      - payment-service
+
+  rabbitmq: # login guest:guest
+    container_name: mq
+    hostname: mq
+    image: rabbitmq:management
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+      - "4369:4369"
+      - "5671:5671"
+      - "5672:5672"
+      - "25672:25672"
+      - "15671:15671"
+      - "15672:15672"
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    networks:
+      - mq-network
 
   order-service:
     build: ./order
     image: order:latest
     environment:
       - GATEWAY_URL=http://gateway:80
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: uvicorn --host 0.0.0.0 --port 5000 --workers 3 app:app
     env_file:
       - env/order_mongo.env
+    depends_on:
+      - rabbitmq
+    networks:
+    - mq-network
+    - order-network
 
   stock-service:
     build: ./stock
     image: stock:latest
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: uvicorn --host 0.0.0.0 --port 5000 --workers 4 app:app
     env_file:
       - env/stock_mongo.env
+    depends_on:
+      - rabbitmq
+    networks:
+    - mq-network
+    - stock-network
 
   payment-service:
     build: ./payment
     image: user:latest
-    command: gunicorn -b 0.0.0.0:5000 app:app
+    command: uvicorn --host 0.0.0.0 --port 5000 --workers 2 app:app
     env_file:
       - env/payment_mongo.env
+    depends_on:
+      - rabbitmq
+    networks:
+    - payment-network
+    - mq-network
 
   order-db:
     build: ./mongo/
@@ -37,7 +82,9 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "order", "--keyFile", "/keyfiles/order-keyfile", "--quiet"] #"--logpath", "/var/log/mongodb/mongod.log"]
+    networks:
+    - order-network
 
   stock-db:
     build: ./mongo/
@@ -45,7 +92,9 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "stock", "--keyFile", "/keyfiles/stock-keyfile", "--quiet"]
+    networks:
+    - stock-network
 
   payment-db:
     build: ./mongo/
@@ -53,7 +102,9 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: mongo
-    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile"]
+    command: ["--bind_ip_all", "--replSet", "payment", "--keyFile", "/keyfiles/payment-keyfile", "--quiet"]
+    networks:
+    - payment-network
 
   mongosetup:
     image: "mongo-setup"
@@ -65,6 +116,20 @@ services:
         - payment-db
     volumes:
         - mongostatus:/data/
+    networks:
+    - payment-network
+    - stock-network
+    - order-network
 
 volumes:
   mongostatus:
+
+networks:
+  order-network:
+    driver: bridge
+  payment-network:
+    driver: bridge
+  stock-network:
+    driver: bridge
+  mq-network:
+    driver: bridge

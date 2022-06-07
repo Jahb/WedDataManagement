@@ -4,14 +4,13 @@ import utils as tu
 
 
 class TestMicroservices(unittest.TestCase):
-    
     def test_stock(self):
         # Test /stock/item/create/<price>
         item: dict = tu.create_item(5)
 
-        self.assertTrue('_id' in item)
+        self.assertTrue('item_id' in item)
 
-        item_id: str = item['_id']
+        item_id: str = item['item_id']
 
         # Test /stock/find/<item_id>
         item: dict = tu.find_item(item_id)
@@ -173,10 +172,10 @@ class TestMicroservices(unittest.TestCase):
         self.assertEqual(credit_after_payment, 975)
 
         payment_resp = tu.payment_pay(user_id, order_id, 25) # repeating the same payment is stopped because of idempotency
-        self.assertTrue(payment_resp == 222)
+        self.assertTrue(tu.status_code_is_success(payment_resp))
 
         payment_resp = tu.payment_pay(user_id, order_id, 50) # repeating the same payment with diff amount is stopped because of idempotency
-        self.assertTrue(payment_resp == 222)
+        self.assertTrue(tu.status_code_is_success(payment_resp))
 
         # only the first payment should have taken effect
         credit_after_payment: int = tu.find_user(user_id)['credit']
