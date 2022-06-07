@@ -145,11 +145,11 @@ def remove_stock_impl(item_id: str, amount: float):
     # TODO - how will we make this idempotent?
     with client.start_session() as session:
         with session.start_transaction():
-            item = find_item_impl(item_id)
+            item = stock.find_one({"_id": ObjectId(item_id)}, session=session)
             if item["stock"] < float(amount):
                 return {"done": False}
 
-            if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(amount)}}).modified_count == 1:
+            if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(amount)}}, session=session).modified_count == 1:
                 return {"done": True}
 
     raise UnknownException()
@@ -158,33 +158,29 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
     LOGGER.info("Removing stocks in one transaction: %r", item_dict)
     with client.start_session() as session:
         with session.start_transaction():
-            try:
-                barrier.insert_one({"_id": ObjectId(idem_key)})
+            if barrier.find_one({"_id": ObjectId(idem_key)}, session=session) is not None:
+                return {"done": True}
 
-                for item_id, count in item_dict.items():
-                    item = find_item_impl(item_id)
-                    if item["stock"] < float(count):
-                        LOGGER.info(f"insufficient stock. have {item['stock']}, want {count} for {item_id}")
-                        session.abort_transaction()
-                        return {'done': False}
+            barrier.insert_one({"_id": ObjectId(idem_key)}, session=session)
 
-                    if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(count)}}).modified_count != 1:
-                        session.abort_transaction()
-                        raise UnknownException()
-            except pymongo.errors.DuplicateKeyError as e:
-                return {'done' : True}
+            for item_id, count in item_dict.items():
+                item = stock.find_one({"_id": ObjectId(item_id)}, session=session)
+                if item["stock"] < float(count):
+                    LOGGER.info(f"insufficient stock. have {item['stock']}, want {count} for {item_id}")
+                    session.abort_transaction()
+                    return {'done': False}
+
+                LOGGER.info(f"sufficient stock. have {item['stock']}, want {count} for {item_id}")
+                if stock.update_one({"_id": ObjectId(item_id)}, {"$inc": {"stock": -float(count)}}, session=session).modified_count != 1:
+                    session.abort_transaction()
+                    raise UnknownException()
 
     return {'done': True}
 
 
 def get_total_cost_impl(item_dict: dict[str, int]):
-    LOGGER.info("Removing stocks in one transaction: %r", item_dict)
-    total_price = 0.0
-    with client.start_session() as session:
-        with session.start_transaction():
-            for item_id, count in item_dict.items():
-                item = find_item_impl(item_id)
-                total_price += float(item['price']) * count
+    LOGGER.info("Removing stocks in one transaction: %r", item_dict)ssssssss
+    total_price = sum(float(find_item_impl(item_id)['price']) * count for item_id, count in item_dict.items())
 
     return {'total_cost': total_price}
 

@@ -23,6 +23,9 @@ from payment_queue_dispatcher import PaymentQueueDispatcher
 class UnknownException(Exception):
     pass
 
+class OutOfOrderException(Exception):
+    pass
+
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -158,46 +161,56 @@ def add_credit_impl(user_id: str, amount: float) -> dict:
 def remove_credit_impl(user_id, order_id, amount) -> dict:
     with client.start_session() as session:
         with session.start_transaction():
-            try:
-                available_credit = float(users.find_one(
-                    {"_id":  ObjectId(user_id)})["credit"])
+            barrier_entry = payment_barrier.find_one({"_id": ObjectId(order_id)}, session=session)
+            payment_already_made = barrier_entry is not None
+            if payment_already_made and float(barrier_entry['amount']) != amount:
+                LOGGER.warn(f"Received payment req for the same order {order_id} " 
+                            + "but with a different amount (old={barrier_entry['amount']}, new={amount}")
+                return {'done': False} 
+            payment_already_reverted = cancel_payment_barrier.find_one({"_id": ObjectId(order_id)}, session=session) is not None 
 
-                if available_credit < float(amount):
-                    return {'done': False}
-
-                payment_barrier.insert_one(
-                    {"_id": ObjectId(order_id), "amount": float(amount)})
-                if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": -float(amount)}}).modified_count == 1:
-                    return {'done': True}
-
-            except pymongo.errors.DuplicateKeyError as e:
+            if payment_already_made and not payment_already_reverted:
                 return {'done': True}
-        
+            
+            available_credit = float(users.find_one({"_id":  ObjectId(user_id)}, session=session)["credit"])
+
+            if available_credit < float(amount):
+                LOGGER.info(f"Not enough credit, wanted {amount}, available {available_credit}")
+                return {'done': False}
+            
+            if payment_already_made and payment_already_reverted:
+                # we probably made and undid this payment. let's allow ourselves to do it again
+                cancel_payment_barrier.delete_one({"_id": ObjectId(order_id)}, session=session)
+            elif not payment_already_made and payment_already_reverted: # payment was not already made
+                LOGGER.warn("payment reverted but not yet made: probably out of order request, will subtract")
+                payment_barrier.insert_one({"_id": ObjectId(order_id), "amount": float(amount)}, session=session)
+            else:
+                payment_barrier.insert_one({"_id": ObjectId(order_id), "amount": float(amount)}, session=session)
+
+            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": -float(amount)}}, session=session).modified_count == 1:
+                return {'done': True}
+
     raise UnknownException()
 
 
 def cancel_payment_impl(user_id: str, order_id: str) -> dict:
     with client.start_session() as session:
         with session.start_transaction():
-            try:
-                barrier_entry = payment_barrier.find_one(
-                    {"_id": ObjectId(order_id)})
-                if barrier_entry is None:
-                    # insert ID into idempotency barriers so that we do not attempt to cancel payment again
-                    # or retry payment
-                    payment_barrier.insert_one(
-                        {"_id": ObjectId(order_id), "amount": float(amount)})
-                    cancel_payment_barrier.insert_one(
-                        {"_id": ObjectId(order_id)})
-                    return {'done': True}
+            barrier_entry = payment_barrier.find_one({"_id": ObjectId(order_id)}, session=session)
+            already_paid = barrier_entry is not None
 
-                amount = float(barrier_entry["amount"])
+            if not already_paid:
+                raise OutOfOrderException("Cancelling before payment: we don't know how much to refund")
 
-                cancel_payment_barrier.insert_one({"_id": ObjectId(order_id)})
-                if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": amount}}).modified_count == 1:
-                    return {'done': True}
-            except pymongo.errors.DuplicateKeyError as e:
-                return {'done' : True}
+            already_cancelled = cancel_payment_barrier.find_one({"_id": ObjectId(order_id)}, session=session) is not None
+            if already_cancelled:
+                return {'done': True}
+
+            amount = float(barrier_entry["amount"])
+
+            cancel_payment_barrier.insert_one({"_id": ObjectId(order_id)}, session=session)
+            if users.update_one({"_id": ObjectId(user_id)}, {"$inc": {"credit": amount}}, session=session).modified_count == 1:
+                return {'done': True}
 
     raise UnknownException()
 
@@ -261,8 +274,11 @@ async def payment_queue_handler() -> None:
                         Message(body=json.dumps(resp).encode(), correlation_id=message.correlation_id),
                         routing_key=message.reply_to)
                     LOGGER.info(f"[payment-queue] completed message {operation}({arg_info_str})")
+            except OutOfOrderException as e:
+                LOGGER.warn(f"Out of order request {e}, requeuing")
+                await message.nack(requeue=True)
             except Exception as e:
-                LOGGER.exception("[payment-queue] processing error %r for message %r", e, message)
+                LOGGER.exception("[payment-queue] processing error %r for message %r", e, message.body.decode())
                 await exchange.publish(
                     Message(body=json.dumps({'error': repr(e)}).encode(), correlation_id=message.correlation_id),
                     routing_key=message.reply_to)
