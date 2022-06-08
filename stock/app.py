@@ -179,7 +179,7 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
 
 
 def get_total_cost_impl(item_dict: dict[str, int]):
-    LOGGER.info("Removing stocks in one transaction: %r", item_dict)ssssssss
+    LOGGER.info("Removing stocks in one transaction: %r", item_dict)
     total_price = sum(float(find_item_impl(item_id)['price']) * count for item_id, count in item_dict.items())
 
     return {'total_cost': total_price}
