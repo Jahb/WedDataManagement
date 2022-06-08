@@ -179,10 +179,16 @@ def remove_multiple_stocks_impl(item_dict: dict[str, int], idem_key: str):
 
 
 def get_total_cost_impl(item_dict: dict[str, int]):
-    LOGGER.info("Removing stocks in one transaction: %r", item_dict)
-    total_price = sum(float(find_item_impl(item_id)['price']) * count for item_id, count in item_dict.items())
+    LOGGER.info("Getting total cost and checking stock: %r", item_dict)
+    total_price = 0
+    sufficient_stock = True
+    for item_id, count in item_dict.items():
+        item = stock.find_one({"_id": ObjectId(item_id)})
+        total_price += item["price"] * count
+        if item["stock"] < float(count):
+            sufficient_stock = False
 
-    return {'total_cost': total_price}
+    return {'total_cost': total_price, "sufficient_stock": sufficient_stock}
 
 async def stock_queue_handler() -> None:
     # should only throw when receiving an unknown operation
