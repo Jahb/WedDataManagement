@@ -141,9 +141,19 @@ async def checkout(order_id):
     # subtracts the stock (via the stock service)
     # and returns a status (success/failure).
 
-    order = await find_order(order_id)
+    order = orders.find_one({"_id": ObjectId(order_id)})
+
     user_id = str(order['user_id'])
-    total_cost = float(order['total_cost'])
+    order_items = order['items']
+
+    counted_items = dict(Counter(order_items))
+    cost_response = await rpc.send_get_total_cost(counted_items)
+    if 'error' in cost_response:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY,
+                            f"could not find item info: {cost_response['error']}")
+    if not cost_response['sufficient_stock']:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, f"not enough stock for order {order_id}")
+    total_cost = float(cost_response['total_cost'])
 
     payment_resp = await rpc.send_remove_credit(user_id, order_id, total_cost)
     if 'error' in payment_resp:
