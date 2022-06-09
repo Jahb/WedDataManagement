@@ -27,7 +27,7 @@ class PaymentQueueDispatcher(object):
 
     async def connect(self) -> "PaymentQueueDispatcher":
         self.connection = await connect(
-            "amqp://admin:admin@mq/", loop=self.loop,
+            "amqp://admin:admin@mq-service/", loop=self.loop,
         )
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(exclusive=True)

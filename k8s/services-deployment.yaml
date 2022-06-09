@@ -1,3 +1,87 @@
+#Rabbit MQ service
+apiVersion: v1
+data:
+  RABBITMQ_DEFAULT_USER: admin
+  RABBITMQ_DEFAULT_PASS: admin
+
+kind: ConfigMap
+metadata:
+  name: rabitmq-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mq
+  name: mq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mq
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mq
+    spec:
+      containers:
+        - agrs: 
+          env:
+          - name: RABBITMQ_DEFAULT_USER
+            valueFrom:
+             configMapKeyRef:
+               key: RABBITMQ_DEFAULT_USER
+               name: rabitmq-env
+          - name: RABBITMQ_DEFAULT_PASS
+            valueFrom:
+             configMapKeyRef:
+               key: RABBITMQ_DEFAULT_PASS
+               name: rabitmq-env
+          image: rabbitmq:management
+          imagePullPolicy: IfNotPresent
+          name: mq
+          ports:
+           - containerPort: 4369
+           - containerPort: 5671
+           - containerPort: 5672
+           - containerPort: 25672
+           - containerPort: 15671
+           - containerPort: 15672
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mq
+  name: mq-service
+spec:
+  ports:
+  - port: 4369
+    targetPort: 4369
+    name: one
+  - port: 5671
+    targetPort: 5671
+    name: two
+  - port: 5672
+    targetPort: 5672
+    name: three    
+  - port: 25672
+    targetPort: 25672
+    name: four    
+  - port: 15671
+    targetPort: 15671    
+    name: five       
+  - port: 15672
+    targetPort: 15672      
+    name: six             
+  selector:
+    app: mq
+  type: ClusterIP
+---
+
 #payment service
 apiVersion: v1
 data:
@@ -28,9 +112,13 @@ spec:
     spec:
       containers:
         - args:
-            - gunicorn
-            - -b
-            - 0.0.0.0:5000
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
             - app:app
           env:
             - name: MONGO_HOST
@@ -55,6 +143,8 @@ spec:
                   name: mongo-payment-env
           image: payment-service:latest
           imagePullPolicy: IfNotPresent
+          ports:
+           - containerPort: 5000          
           name: payment-api
           resources: {}
       restartPolicy: Always
@@ -107,9 +197,13 @@ spec:
     spec:
       containers:
         - args:
-            - gunicorn
-            - -b
-            - 0.0.0.0:5000
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
             - app:app
           env:
             - name: MONGO_HOST
@@ -133,6 +227,8 @@ spec:
                   key: MONGO_USERNAME
                   name: mongo-stock-env
           image: stock-service:latest
+          ports:
+           - containerPort: 5000             
           imagePullPolicy: IfNotPresent
           name: stock-api
           resources: {}
@@ -185,9 +281,13 @@ spec:
     spec:
       containers:
         - args:
-            - gunicorn
-            - -b
-            - 0.0.0.0:5000
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
             - app:app
           ports:
             - containerPort: 5000            

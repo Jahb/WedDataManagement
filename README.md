@@ -83,10 +83,9 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
     * stock -> stock-service:latest
 3. run `kubectl apply -f ./k8s/databases-deployment.yaml` Which spawns all the database processes and creating replicasets
 4. run `kubectl apply -f ./k8s/ngninx-ingress-controller.yaml` Which spawnsthe nginx ingress controller inside another namespace.
-5. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway. 
-6. run `kubectl get svc` to display the availble port for which the gateway is accessible and the cluster from the outside.  
-7. Forward the port: `kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8080:80`
-8. goto webdb.localdev.me:8080 to access the services.
+5. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway.  
+6. Forward the port: `kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8080:80`
+7. goto webdb.localdev.me:8080 to access the services.
 
 
 Resources: https://kubernetes.github.io/ingress-nginx/deploy/#quick-start
