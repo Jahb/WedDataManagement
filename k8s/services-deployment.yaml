@@ -257,7 +257,7 @@ data:
   MONGO_PASSWORD: mongo
   MONGO_PORT: "27017"
   MONGO_USERNAME: root
-  GATEWAY_URL: "gateway-service:8000"
+  GATEWAY_URL: "gateway-service:30001"
 kind: ConfigMap
 metadata:
   name: mongo-order-env
@@ -379,7 +379,8 @@ spec:
   ports:
     - name: "8000"
       port: 8000
-      targetPort: 80      
+      targetPort: 80     
+      nodePort: 30001
   selector:
     app: gateway
 status:
