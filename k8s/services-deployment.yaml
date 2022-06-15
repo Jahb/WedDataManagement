@@ -425,5 +425,11 @@ spec:
           name: payment-api-service
           port:
             number: 5000
-
-
+     - path: /rabbitdashboard/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: mq-service
+          port:
+            number: 15672
+---
