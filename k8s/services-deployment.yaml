@@ -85,7 +85,7 @@ spec:
 #payment service
 apiVersion: v1
 data:
-  MONGO_HOST: payment-db-service
+  MONGO_HOST: payment-db-mongodb-headless
   MONGO_PASSWORD: mongo
   MONGO_PORT: "27017"
   MONGO_USERNAME: root
@@ -169,7 +169,7 @@ spec:
 
 apiVersion: v1
 data:
-  MONGO_HOST: stock-db-service
+  MONGO_HOST: stock-db-mongodb-headless 
   MONGO_PASSWORD: mongo
   MONGO_PORT: "27017"
   MONGO_USERNAME: root
@@ -253,11 +253,11 @@ spec:
 #order service
 apiVersion: v1
 data:
-  MONGO_HOST: order-db-service
+  MONGO_HOST: order-db-mongodb-headless 
   MONGO_PASSWORD: mongo
   MONGO_PORT: "27017"
   MONGO_USERNAME: root
-  GATEWAY_URL: "localhost:30856"
+  GATEWAY_URL: "gateway-service:8000"
 kind: ConfigMap
 metadata:
   name: mongo-order-env
@@ -432,4 +432,3 @@ spec:
           name: mq-service
           port:
             number: 15672
----

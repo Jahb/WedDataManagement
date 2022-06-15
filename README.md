@@ -84,6 +84,11 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
     !Step 2 not needed now it pulls from Jahb dockerhub repos
 
 3. run `kubectl apply -f ./k8s/databases-deployment.yaml` Which spawns all the database processes and creating replicasets
+3. Setup the databases: 
+    add helm repo: `helm repo add bitnami https://charts.bitnami.com/bitnami`
+    payment-db: `helm install payment-db --set auth.rootPassword=mongo,architecture=replicaset bitnami/mongodb`
+    order-db: `helm install order-db --set auth.rootPassword=mongo,architecture=replicaset bitnami/mongodb`
+    stock-db: `helm install stock-db --set auth.rootPassword=mongo,architecture=replicaset bitnami/mongodb`
 4. run `kubectl apply -f ./k8s/ngninx-ingress-controller.yaml` Which spawnsthe nginx ingress controller inside another namespace.
 5. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway.  
 6. Forward the port: `kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8080:80`
@@ -93,9 +98,6 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
 Resources: https://kubernetes.github.io/ingress-nginx/deploy/#quick-start
 Using minikube ingress might be manually enabled.
 `kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.2.0/deploy/static/provider/cloud/deploy.yaml`
-
-
-TODO: The ingress controllor seems unavailble from accessing through the nginx controller.  
 
 
 *** OLD minikube (local k8s cluster) ***
