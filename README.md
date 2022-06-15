@@ -82,8 +82,6 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
     * payment -> payment-service:latest
     * stock -> stock-service:latest
     !Step 2 not needed now it pulls from Jahb dockerhub repos
-
-3. run `kubectl apply -f ./k8s/databases-deployment.yaml` Which spawns all the database processes and creating replicasets
 3. Setup the databases: 
     add helm repo: `helm repo add bitnami https://charts.bitnami.com/bitnami`
     payment-db: `helm install payment-db --set auth.rootPassword=mongo,architecture=replicaset bitnami/mongodb`
