@@ -81,6 +81,8 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
     * order -> order-service:latest
     * payment -> payment-service:latest
     * stock -> stock-service:latest
+    !Step 2 not needed now it pulls from Jahb dockerhub repos
+
 3. run `kubectl apply -f ./k8s/databases-deployment.yaml` Which spawns all the database processes and creating replicasets
 4. run `kubectl apply -f ./k8s/ngninx-ingress-controller.yaml` Which spawnsthe nginx ingress controller inside another namespace.
 5. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway.  
@@ -90,6 +92,7 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
 
 Resources: https://kubernetes.github.io/ingress-nginx/deploy/#quick-start
 Using minikube ingress might be manually enabled.
+`kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.2.0/deploy/static/provider/cloud/deploy.yaml`
 
 
 TODO: The ingress controllor seems unavailble from accessing through the nginx controller.  

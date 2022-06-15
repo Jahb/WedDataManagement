@@ -141,7 +141,7 @@ spec:
                 configMapKeyRef:
                   key: MONGO_USERNAME
                   name: mongo-payment-env
-          image: payment-service:latest
+          image: jahb/user:latest
           imagePullPolicy: IfNotPresent
           ports:
            - containerPort: 5000          
@@ -226,7 +226,7 @@ spec:
                 configMapKeyRef:
                   key: MONGO_USERNAME
                   name: mongo-stock-env
-          image: stock-service:latest
+          image: jahb/stock:latest
           ports:
            - containerPort: 5000             
           imagePullPolicy: IfNotPresent
@@ -317,7 +317,7 @@ spec:
                 configMapKeyRef:
                   key: GATEWAY_URL
                   name: mongo-order-env                  
-          image: order-service:latest
+          image: jahb/order:latest
           imagePullPolicy: IfNotPresent
           name: order-api
           resources: {}

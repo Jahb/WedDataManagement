@@ -28,7 +28,7 @@ spec:
               value: mongo
             - name: MONGO_INITDB_ROOT_USERNAME
               value: root
-          image: weddatamanagementmongo:latest
+          image: jahb/weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent          
           name: payment-db
           resources: {}
@@ -81,7 +81,7 @@ spec:
               value: mongo
             - name: MONGO_INITDB_ROOT_USERNAME
               value: root
-          image: weddatamanagementmongo:latest
+          image: jahb/weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent
           name: order-db
           resources: {}
@@ -134,7 +134,7 @@ spec:
               value: mongo
             - name: MONGO_INITDB_ROOT_USERNAME
               value: root
-          image: weddatamanagementmongo:latest
+          image: jahb/weddatamanagementmongo:latest
           imagePullPolicy: IfNotPresent
           name: stock-db
           resources: {}
@@ -176,7 +176,7 @@ spec:
         app: mongosetup
     spec:
       containers:
-        - image: weddatamanagementmongosetup:latest
+        - image: jahb/mongo-setup:latest
           imagePullPolicy: IfNotPresent
           name: mongosetup
 status: {}
