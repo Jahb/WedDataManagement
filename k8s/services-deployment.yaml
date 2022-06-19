@@ -1,0 +1,435 @@
+#Rabbit MQ service
+apiVersion: v1
+data:
+  RABBITMQ_DEFAULT_USER: admin
+  RABBITMQ_DEFAULT_PASS: admin
+
+kind: ConfigMap
+metadata:
+  name: rabitmq-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mq
+  name: mq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mq
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mq
+    spec:
+      containers:
+        - agrs: 
+          env:
+          - name: RABBITMQ_DEFAULT_USER
+            valueFrom:
+             configMapKeyRef:
+               key: RABBITMQ_DEFAULT_USER
+               name: rabitmq-env
+          - name: RABBITMQ_DEFAULT_PASS
+            valueFrom:
+             configMapKeyRef:
+               key: RABBITMQ_DEFAULT_PASS
+               name: rabitmq-env
+          image: rabbitmq:management
+          imagePullPolicy: IfNotPresent
+          name: mq
+          ports:
+           - containerPort: 4369
+           - containerPort: 5671
+           - containerPort: 5672
+           - containerPort: 25672
+           - containerPort: 15671
+           - containerPort: 15672
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mq
+  name: mq-service
+spec:
+  ports:
+  - port: 4369
+    targetPort: 4369
+    name: one
+  - port: 5671
+    targetPort: 5671
+    name: two
+  - port: 5672
+    targetPort: 5672
+    name: three    
+  - port: 25672
+    targetPort: 25672
+    name: four    
+  - port: 15671
+    targetPort: 15671    
+    name: five       
+  - port: 15672
+    targetPort: 15672      
+    name: six             
+  selector:
+    app: mq
+  type: ClusterIP
+---
+
+#payment service
+apiVersion: v1
+data:
+  MONGO_HOST: payment-db-mongodb-headless
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  name: mongo-payment-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: payment-api
+  name: payment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - args:
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
+            - app:app
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-payment-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-payment-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-payment-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-payment-env
+          image: jahb/user:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+           - containerPort: 5000          
+          name: payment-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: payment-api
+  name: payment-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: payment-api
+  type: ClusterIP
+---
+#stock service
+
+apiVersion: v1
+data:
+  MONGO_HOST: stock-db-mongodb-headless 
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+kind: ConfigMap
+metadata:
+  name: mongo-stock-env
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: stock-api
+  name: stock-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: stock-api
+    spec:
+      containers:
+        - args:
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
+            - app:app
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-stock-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-stock-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-stock-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-stock-env
+          image: jahb/stock:latest
+          ports:
+           - containerPort: 5000             
+          imagePullPolicy: IfNotPresent
+          name: stock-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: stock-api
+  name: stock-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: stock-api
+  type: ClusterIP
+---
+#order service
+apiVersion: v1
+data:
+  MONGO_HOST: order-db-mongodb-headless 
+  MONGO_PASSWORD: mongo
+  MONGO_PORT: "27017"
+  MONGO_USERNAME: root
+  GATEWAY_URL: "gateway-service:30001"
+kind: ConfigMap
+metadata:
+  name: mongo-order-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: order-api
+  name: order-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: order-api
+    spec:
+      containers:
+        - args:
+            - uvicorn
+            - --host 
+            - 0.0.0.0
+            - --port 
+            - '5000'
+            - --workers 
+            - '3'
+            - app:app
+          ports:
+            - containerPort: 5000            
+          env:
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: mongo-order-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: mongo-order-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: mongo-order-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: mongo-order-env
+            - name: GATEWAY_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: GATEWAY_URL
+                  name: mongo-order-env                  
+          image: jahb/order:latest
+          imagePullPolicy: IfNotPresent
+          name: order-api
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: order-api
+  name: order-api-service
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: order-api
+  type: ClusterIP
+
+---
+# Gateway service 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gateway
+  name: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - image: nginx:latest
+          name: gateway
+          ports:
+            - containerPort: 80
+          resources: {}
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gateway
+  name: gateway-service
+spec:
+  type: NodePort
+  ports:
+    - name: "8000"
+      port: 8000
+      targetPort: 80     
+      nodePort: 30001
+  selector:
+    app: gateway
+status:
+  loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+ name: ingress-service
+ annotations: 
+   kubernetes.io/ingress.class: nginx
+   nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+ rules:
+ - host: webdb.localdev.me
+   http:
+    paths:
+     - path: /
+       pathType: Prefix
+       backend:
+        service:
+          name: gateway-service
+          port:
+            number: 8000      
+     - path: /orders/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: order-api-service
+          port:
+            number: 5000
+     - path: /stock/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: stock-api-service
+          port:
+            number: 5000
+     - path: /payment/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: payment-api-service
+          port:
+            number: 5000
+     - path: /rabbitdashboard/?(.*)
+       pathType: Prefix
+       backend:
+        service:
+          name: mq-service
+          port:
+            number: 15672

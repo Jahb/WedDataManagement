@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service-service
+  namespace: default  
+spec:
+  type: NodePort
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: order-service
+  name: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: order-service
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: order-service
+    spec:
+      containers:
+        - args:
+            - gunicorn
+            - -b
+            - 0.0.0.0:5000
+            - app:app
+          env:
+            - name: GATEWAY_URL
+              value: http://gateway:80
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_HOST
+                  name: env-order-mongo-env
+            - name: MONGO_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PASSWORD
+                  name: env-order-mongo-env
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_PORT
+                  name: env-order-mongo-env
+            - name: MONGO_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  key: MONGO_USERNAME
+                  name: env-order-mongo-env
+          image: order:latest
+          imagePullPolicy: IfNotPresent
+          name: order-service
+          resources: {}
+      restartPolicy: Always
+status: {}

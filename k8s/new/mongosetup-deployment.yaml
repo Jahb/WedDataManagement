@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: mongosetup
+  name: mongosetup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: mongosetup
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: mongosetup
+    spec:
+      containers:
+        - image: mongo-setup
+          name: mongosetup
+          resources: {}
+          volumeMounts:
+            - mountPath: /data/
+              name: mongostatus
+      restartPolicy: Always
+      volumes:
+        - name: mongostatus
+          persistentVolumeClaim:
+            claimName: mongostatus
+status: {}

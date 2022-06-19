@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: order-db
+  name: order-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: order-db
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: order-db
+    spec:
+      containers:
+        - args:
+            - --bind_ip_all
+            - --replSet
+            - order
+            - --keyFile
+            - /keyfiles/order-keyfile
+          env:
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: mongo
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: root
+          image: weddatamanagement_order-db
+          imagePullPolicy: IfNotPresent
+          name: order-db
+          resources: {}
+      restartPolicy: Always
+status: {}

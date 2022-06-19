@@ -229,7 +229,7 @@ def payment_status_impl(order_id: str) -> dict:
 async def payment_queue_handler() -> None:
     # should only throw when receiving an unknown operation
     # which should never happen unless we messed up. so throwing is probably fine
-    connection = await connect("amqp://admin:admin@mq/")
+    connection = await connect("amqp://admin:admin@mq-service/")
 
     channel = await connection.channel()
     exchange = channel.default_exchange

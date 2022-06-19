@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: order-service
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     component: order
   ports:
@@ -28,6 +28,7 @@ spec:
       containers:
         - name: order
           image: order:latest
+          imagePullPolicy: IfNotPresent
           resources:
             limits:
               memory: "1Gi"
@@ -50,3 +51,7 @@ spec:
               value: '27017'
             - name: MONGO_PASSWORD
               value: "mongo"
+            - name: MONGO_USERNAME
+              value: "root"
+            - name: GATEWAY_URL
+              value: 'localhost:1234'
