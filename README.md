@@ -1,3 +1,20 @@
+# Web-Scale Data Management Group 8
+
+## How to deploy
+Make sure you have minikube with ingress enabled.
+
+To run the deploy script run `full-deploy.sh` from the root folder with the endpoint as an argument. So an example is: `./full-deploy.sh webdb.localdev.me`.
+Pods may take some time to ready up.
+
+If the K8 deployment is failing the service logic can still be tested with normal docker (If k8s is really not working :c ).
+`docker-compose up --build`
+You can use the localhost:8080 endpoint if not using k8s.
+
+
+<!-- 
+
+
+
 # Web-scale Data Management Project Template
 
 Basic project structure with Python's Flask and Redis. 
@@ -84,9 +101,9 @@ After coding the REST endpoint logic run `docker-compose up --build` in the base
     !Step 2 not needed now it pulls from Jahb dockerhub repos
 3. Setup the databases: 
     add helm repo: `helm repo add bitnami https://charts.bitnami.com/bitnami`
-    payment-db: `helm install payment-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.enabled=true bitnami/mongodb`
-    order-db: `helm install order-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.enabled=true bitnami/mongodb`
-    stock-db: `helm install stock-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.enabled=true bitnami/mongodb`
+    payment-db: `helm install payment-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.size=200Mi,persistence.enabled=true,readinessProbe.initialDelaySeconds=20,readinessProbe.timeoutSeconds=20 bitnami/mongodb`
+    order-db: `helm install order-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.size=200Mi,persistence.enabled=true,readinessProbe.initialDelaySeconds=20,readinessProbe.timeoutSeconds=20 bitnami/mongodb`
+    stock-db: `helm install stock-db --set auth.rootPassword=mongo,architecture=replicaset,persistence.size=200Mi,persistence.enabled=true,readinessProbe.initialDelaySeconds=20,readinessProbe.timeoutSeconds=20 bitnami/mongodb`
 4. run `kubectl apply -f ./k8s/ngninx-ingress-controller.yaml` Which spawnsthe nginx ingress controller inside another namespace.
 5. run `kubectl apply -f ./k8s/services-deployment.yaml` which spins up all the flask api's and the nginx gateway.  
 6. Forward the port: `kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8080:80`
@@ -111,4 +128,4 @@ but you can find any database you want in https://artifacthub.io/ and adapt the 
 
 Similarly to the `minikube` deployment but run the `deploy-charts-cluster.sh` in the helm step to also install an ingress to the cluster. 
 
-***Requirements:*** You need to have access to kubectl of a k8s cluster.
+***Requirements:*** You need to have access to kubectl of a k8s cluster. -->
