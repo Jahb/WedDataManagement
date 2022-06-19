@@ -1,7 +1,7 @@
 # Web-Scale Data Management Group 8
 
 ## How to deploy
-Make sure you have minikube with ingress enabled.
+Make sure you have minikube with ingress enabled. (Kubectl & Helm required)
 
 To run the deploy script run `full-deploy.sh` from the root folder with the endpoint as an argument. So an example is: `./full-deploy.sh webdb.localdev.me`.
 Pods may take some time to ready up.
