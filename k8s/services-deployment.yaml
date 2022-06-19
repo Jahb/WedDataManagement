@@ -39,7 +39,7 @@ spec:
                key: RABBITMQ_DEFAULT_PASS
                name: rabitmq-env
           image: rabbitmq:management
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           name: mq
           ports:
            - containerPort: 4369
@@ -142,7 +142,7 @@ spec:
                   key: MONGO_USERNAME
                   name: mongo-payment-env
           image: jahb/user:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
            - containerPort: 5000          
           name: payment-api
@@ -229,7 +229,7 @@ spec:
           image: jahb/stock:latest
           ports:
            - containerPort: 5000             
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           name: stock-api
           resources: {}
       restartPolicy: Always
@@ -318,7 +318,7 @@ spec:
                   key: GATEWAY_URL
                   name: mongo-order-env                  
           image: jahb/order:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           name: order-api
           resources: {}
       restartPolicy: Always

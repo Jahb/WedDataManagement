@@ -6,7 +6,7 @@ Make sure you have minikube with ingress enabled.
 To run the deploy script run `full-deploy.sh` from the root folder with the endpoint as an argument. So an example is: `./full-deploy.sh webdb.localdev.me`.
 Pods may take some time to ready up.
 
-If the K8 deployment is failing the service logic can still be tested with normal docker (If k8s is really not working :c ).
+If the K8 deployment is not working the service logic can still be tested with normal docker containers.
 `docker-compose up --build`
 You can use the localhost:8080 endpoint if not using k8s.
 
@@ -17,7 +17,7 @@ https://hub.docker.com/repository/docker/jahb/order
 
 
 ## Presentation Slides:
-https://docs.google.com/presentation/d/1Im9FTw_gcACZJJlYyniGkALo5fJEtrssU_tJP6z-74k/edit#slide=id.gf41cfa9430_0_0
+https://docs.google.com/presentation/d/1Im9FTw_gcACZJJlYyniGkALo5fJEtrssU_tJP6z-74k/edit?usp=sharing
 
 <!-- 
 
