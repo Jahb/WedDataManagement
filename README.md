@@ -10,6 +10,10 @@ If the K8 deployment is failing the service logic can still be tested with norma
 `docker-compose up --build`
 You can use the localhost:8080 endpoint if not using k8s.
 
+## Dockerhub image links:
+https://hub.docker.com/repository/docker/jahb/stock
+https://hub.docker.com/repository/docker/jahb/user
+https://hub.docker.com/repository/docker/jahb/order
 
 <!-- 
 
